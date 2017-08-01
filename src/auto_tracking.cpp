@@ -244,7 +244,7 @@ public:
         point.z = particles->points[i].z;
         particle_cloud->points.push_back (point);
       }
-      
+      if (visualize_particles_)
       {
         pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> blue_color (particle_cloud, 250, 99, 71);
         if (!viz.updatePointCloud (particle_cloud, blue_color, "particle cloud"))
@@ -271,6 +271,7 @@ public:
     //pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
     pcl::transformPointCloud<RefPointType> (*reference_, *result_cloud, transformation);
 
+    if (visualize_particles_)
     {
       pcl::visualization::PointCloudColorHandlerCustom<RefPointType> red_color (result_cloud, 0, 0, 255);
       if (!viz.updatePointCloud (result_cloud, red_color, "resultcloud"))
@@ -282,7 +283,7 @@ public:
   void
   viz_cb (pcl::visualization::PCLVisualizer& viz)
   {
-    ROS_ERROR("Inside viz_cb");
+    // ROS_ERROR("Inside viz_cb");
 
     // boost::mutex::scoped_lock lock (mtx_);
 
@@ -355,8 +356,11 @@ public:
 
     if (tracked_cloud_)
     {
-      ///// Bounding box
+      // Remove previous elements
       viz.removeShape("cube");
+      viz.removeCoordinateSystem();
+
+      // Bounding box 
       // compute principal direction
       Eigen::Vector4f centroid;
       pcl::compute3DCentroid(*tracked_cloud_, centroid);
@@ -385,6 +389,16 @@ public:
 
       // Compute position and orientation
       // Multiply centroid by transformation matrix
+      Eigen::Vector3f centroids = centroid.head<3>();
+      ROS_ERROR_STREAM("Tracked object position: " <<  
+                        centroids[0] << " " << 
+                        centroids[1] << " " << 
+                        centroids[2]);
+      Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
+      trans = eigDx;
+      trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
+      viz.addCoordinateSystem (0.25, trans);
+
     }
 
   }
@@ -458,7 +472,7 @@ public:
   {
     boost::mutex::scoped_lock lock (mtx_);
 
-    ROS_ERROR("Inside cloud_cb");
+    // ROS_ERROR("Inside cloud_cb");
 
     std::cerr << "cloud : " << cloud->width * cloud->height << " data points." << std::endl;
     
@@ -535,9 +549,7 @@ public:
 
     }
     else //track the object
-    {  
-
-      // run the tracking system        
+    {      
       std::cerr << "PointCloud before downsampled: " << cloud_pass_->width * cloud_pass_->height << " data points." << std::endl;
       gridSampleApprox (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
       std::cerr << "PointCloud after downsampled: " << cloud_pass_downsampled_->width * cloud_pass_downsampled_->height << " data points." << std::endl;
@@ -576,14 +588,9 @@ public:
     ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
     ros::spin ();
 
-    // Run viewer
-    // viewer_ (new pcl::visualization::PCLVisualizer ("Viewer"));
-    //viewer_.runOnVisualizationThread (boost::bind(&OpenNISegmentTracking::viz_cb, this, _1), "viz_cb");
-      
     // while (!viewer_.wasStopped ())
     while (ros::ok())
       viewer_.spinOnce (100, true);
-      // boost::this_thread::sleep(boost::posix_time::seconds(0.2));
       boost::this_thread::sleep( boost::posix_time::milliseconds(100));
   }
   
