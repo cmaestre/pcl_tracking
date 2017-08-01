@@ -56,17 +56,23 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   std::cerr << "PointCloud before filtering: " << input_tf_pcl->width * input_tf_pcl->height << " data points." << std::endl;
 
   // Create the filtering object
-  pcl::PointCloud<PointType>::Ptr cloud_filtered (new pcl::PointCloud<PointType>);
+  pcl::PointCloud<PointType>::Ptr cloud_filteredZ (new pcl::PointCloud<PointType>);
   pcl::PointCloud<PointType>::Ptr cloud_filteredX (new pcl::PointCloud<PointType>);
+  pcl::PointCloud<PointType>::Ptr cloud_filteredY (new pcl::PointCloud<PointType>);
   pcl::PassThrough<PointType> pass;
   pass.setInputCloud (input_tf_pcl);
   pass.setFilterFieldName ("z");
-  pass.setFilterLimits (-0.18, 0.2);
-  pass.filter (*cloud_filtered);
+  pass.setFilterLimits (-0.19, 0.2);
+  pass.filter (*cloud_filteredZ);
 
-  pass.setInputCloud (cloud_filtered);
+  pass.setInputCloud (cloud_filteredZ);
   pass.setFilterFieldName ("y");
   pass.setFilterLimits (-0.25, 0.25);
+  pass.filter (*cloud_filteredY);
+
+  pass.setInputCloud (cloud_filteredY);
+  pass.setFilterFieldName ("x");
+  pass.setFilterLimits (0.65, 0.95);
   pass.filter (*cloud_filteredX);
 
   std::cerr << "PointCloud after filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
@@ -97,11 +103,10 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf); 
 
   // // Write the original version to disk
-  // writer.write<PointType> ("src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
-
-  // Write the downsampled version to disk
   pcl::PCDWriter writer;
-  // writer.write<PointType> (output_filename, *cloud_filteredX, false);
+  writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
+
+  // Write the downsampled version to disk  
   writer.write<PointType> (output_filename, *tmp_cloud_pcl_tf, false);
 
   ros::shutdown();
@@ -134,4 +139,5 @@ main (int argc, char** argv)
 
   // Spin
   ros::spin ();
+
 }

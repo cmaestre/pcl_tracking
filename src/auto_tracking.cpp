@@ -510,7 +510,7 @@ public:
       removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
       std::cerr << "nonzero_ref: " << nonzero_ref->width * nonzero_ref->height << " data points." << std::endl;
       
-      PCL_INFO ("calculating cog\n");
+      PCL_INFO ("calculating cog\n"); // center of gravity
       
       Eigen::Vector4f c;
       RefCloudPtr transed_ref (new RefCloud);
