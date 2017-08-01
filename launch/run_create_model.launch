@@ -1,0 +1,9 @@
+<launch> 
+  <include file="$(find kinect2_bridge)/launch/kinect2_bridge.launch" />
+
+  <arg name="camera_link_pose" default="0.227452 -0.0841643 0.87455 0.69823 -0.678333 0.149447 -0.185532"/>
+  <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/> 
+
+  <arg name="model_name" />
+  <node name="pcl_tracking" pkg="pcl_tracking" type="create_model" args="$(find pcl_tracking)/src/$(arg model_name).pcd" output="screen"/> 
+</launch>

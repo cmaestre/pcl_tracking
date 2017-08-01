@@ -72,9 +72,9 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 
   std::cerr << "PointCloud after filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
 
-  // Write the original version to disk
+  // // Write the original version to disk
   pcl::PCDWriter writer;
-  writer.write<PointType> ("src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
+  // writer.write<PointType> ("src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
 
   // Write the downsampled version to disk 
   writer.write<PointType> (output_filename, *cloud_filteredX, false);
@@ -87,14 +87,15 @@ main (int argc, char** argv)
 {
   if (argc < 2)
     {
-      PCL_WARN("Please set model name: rosrun pcl_tracking create_model model_name \n");
+      PCL_WARN("Please set model name: roslaunch pcl_tracking run_create_model.launch model_name:=name \n");
       exit (1);
     }
   else 
     {
-      std::ostringstream oss;
-      oss << "src/pcl_tracking/src/" + std::string (argv[1]) + ".pcd";
-      output_filename = oss.str();
+      // std::ostringstream oss;
+      // oss << "src/pcl_tracking/src/" + std::string (argv[1]) + ".pcd";
+      // output_filename = oss.str();
+      output_filename = std::string (argv[1]);
     }
 
   // Initialize ROS

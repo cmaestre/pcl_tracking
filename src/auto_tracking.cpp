@@ -268,7 +268,7 @@ public:
     transformation.translation () += Eigen::Vector3f (0.0f, 0.0f, -0.005f);
     RefCloudPtr result_cloud (new RefCloud ());
 
-    //pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
+    // pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
     pcl::transformPointCloud<RefPointType> (*reference_, *result_cloud, transformation);
 
     if (visualize_particles_)
@@ -285,12 +285,9 @@ public:
   {
     // ROS_ERROR("Inside viz_cb");
 
-    // boost::mutex::scoped_lock lock (mtx_);
-
     // set initial position of the camera
     viz.setBackgroundColor(0, 0, 0);
     viz.setCameraClipDistances(0.0106913, 2);
-    // viz.setCameraPosition( 0.22543, 0.942367, -1.04499, 0.0702978, 0.317386, -0.0205721, 0.0647538, -0.85621, -0.512554);
     viz.setCameraPosition( 0, 0, 1, 0.25, 0, 0.57, 0.43, 0, 1.25);
     viz.setCameraFieldOfView(1);
     viz.setSize(960, 716);
@@ -346,60 +343,52 @@ public:
         viz.addText ((boost::format ("particles:     %d") % tracker_->getParticles ()->points.size ()).str (),
                      10, 120, 20, 1.0, 1.0, 1.0, "particles");
         
+        ///// Bounding box
+        viz.removeShape("cube");
+
+        // Remove previous elements
+        viz.removeShape("cube");
+        viz.removeCoordinateSystem();
+
+        // compute principal direction
+        Eigen::Vector4f centroid;
+        pcl::compute3DCentroid(*tracked_cloud_, centroid);
+        Eigen::Matrix3f covariance;
+        computeCovarianceMatrixNormalized(*tracked_cloud_, centroid, covariance);
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+        Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+        eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+
+        // move the points to the reference frame
+        Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+        p2w.block<3,3>(0,0) = eigDx.transpose();
+        p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
+        pcl::PointCloud<RefPointType> cPoints;
+        pcl::transformPointCloud(*tracked_cloud_, cPoints, p2w);
+
+        RefPointType min_pt, max_pt;
+        pcl::getMinMax3D(cPoints, min_pt, max_pt);
+        const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
+        // final transform
+        const Eigen::Quaternionf qfinal(eigDx);
+        const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
+
+        viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z);
+        viz.setRepresentationToWireframeForAllActors();
+
+        // Compute position and orientation
+        Eigen::Vector3f centroids = centroid.head<3>();
+        ROS_ERROR_STREAM("Tracked object position: " <<  
+                          centroids[0] << " " << 
+                          centroids[1] << " " << 
+                          centroids[2]);
+        Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
+        trans = eigDx;
+        trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
+        viz.addCoordinateSystem (0.25, trans);
       }
     }
     new_cloud_ = false;
-
-    ///// Bounding box
-
-    viz.removeShape("cube");
-
-    if (tracked_cloud_)
-    {
-      // Remove previous elements
-      viz.removeShape("cube");
-      viz.removeCoordinateSystem();
-
-      // Bounding box 
-      // compute principal direction
-      Eigen::Vector4f centroid;
-      pcl::compute3DCentroid(*tracked_cloud_, centroid);
-      Eigen::Matrix3f covariance;
-      computeCovarianceMatrixNormalized(*tracked_cloud_, centroid, covariance);
-      Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-      Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
-      eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
-
-      // move the points to the reference frame
-      Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
-      p2w.block<3,3>(0,0) = eigDx.transpose();
-      p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
-      pcl::PointCloud<RefPointType> cPoints;
-      pcl::transformPointCloud(*tracked_cloud_, cPoints, p2w);
-
-      RefPointType min_pt, max_pt;
-      pcl::getMinMax3D(cPoints, min_pt, max_pt);
-      const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
-      // final transform
-      const Eigen::Quaternionf qfinal(eigDx);
-      const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
-
-      viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z);
-      viz.setRepresentationToWireframeForAllActors();
-
-      // Compute position and orientation
-      // Multiply centroid by transformation matrix
-      Eigen::Vector3f centroids = centroid.head<3>();
-      ROS_ERROR_STREAM("Tracked object position: " <<  
-                        centroids[0] << " " << 
-                        centroids[1] << " " << 
-                        centroids[2]);
-      Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
-      trans = eigDx;
-      trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
-      viz.addCoordinateSystem (0.25, trans);
-
-    }
 
   }
 
@@ -409,8 +398,6 @@ public:
     pcl::PassThrough<PointType> pass;
     pass.setFilterFieldName ("z");
     pass.setFilterLimits (-1, 1);
-    //pass.setFilterLimits (0.0, 1.5);
-    //pass.setFilterLimits (0.0, 0.6);
     pass.setKeepOrganized (false);
     pass.setInputCloud (cloud);
     pass.filter (result);
@@ -426,7 +413,6 @@ public:
     grid.setLeafSize (float (leaf_size), float (leaf_size), float (leaf_size));
     grid.setInputCloud (cloud);
     grid.filter (result);
-    //result = *cloud;
     double end = pcl::getTime ();
     downsampling_time_ = end - start;
     FPS_CALC_END("gridSample");
@@ -441,7 +427,6 @@ public:
     grid.setLeafSize (static_cast<float> (leaf_size), static_cast<float> (leaf_size), static_cast<float> (leaf_size));
     grid.setInputCloud (cloud);
     grid.filter (result);
-    //result = *cloud;
     double end = pcl::getTime ();
     downsampling_time_ = end - start;
     FPS_CALC_END("gridSample");
@@ -472,7 +457,7 @@ public:
   {
     boost::mutex::scoped_lock lock (mtx_);
 
-    // ROS_ERROR("Inside cloud_cb");
+    // ROS_ERROR("Inside cloud_cb");    
 
     std::cerr << "cloud : " << cloud->width * cloud->height << " data points." << std::endl;
     
@@ -521,7 +506,6 @@ public:
     }
     else if (counter_ == nb_wait_iter) // set object to track
     {
-
       std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
 
       RefCloudPtr nonzero_ref (new RefCloud);
@@ -554,7 +538,11 @@ public:
       gridSampleApprox (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
       std::cerr << "PointCloud after downsampled: " << cloud_pass_downsampled_->width * cloud_pass_downsampled_->height << " data points." << std::endl;
       tracker_->setInputCloud (cloud_pass_downsampled_);
-      tracker_->compute ();
+      try{
+        tracker_->compute ();
+      } catch (int e) {
+        ROS_ERROR_STREAM("Object not recognized");
+      }
     }
     
     new_cloud_ = true;
@@ -622,7 +610,7 @@ main (int argc, char** argv)
 {
   bool use_convex_hull = true;
   bool visualize_non_downsample = true;
-  bool visualize_particles = false;
+  bool visualize_particles = true;
   bool use_fixed = false;
 
   double downsampling_grid_size = 0.01;
