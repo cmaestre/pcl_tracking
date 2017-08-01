@@ -150,7 +150,7 @@ public:
   OpenNISegmentTracking (const std::string& device_id, int thread_nr, double downsampling_grid_size,
                          bool use_convex_hull,
                          bool visualize_non_downsample, bool visualize_particles,
-                         bool use_fixed)
+                         bool use_fixed, bool print_time)
   : viewer_ ("PCL OpenNI Tracking Viewer")
   , device_id_ (device_id)
   , new_cloud_ (false)
@@ -160,6 +160,7 @@ public:
   , visualize_non_downsample_ (visualize_non_downsample)
   , visualize_particles_ (visualize_particles)
   , downsampling_grid_size_ (downsampling_grid_size)
+  , print_time_ (print_time)
   {
     KdTreePtr tree (new KdTree (false));
     ne_.setSearchMethod (tree);
@@ -285,13 +286,19 @@ public:
   {
     // ROS_ERROR("Inside viz_cb");
 
-    // set initial position of the camera
+    // viz.setBackgroundColor(0, 0, 0);
+    // viz.setCameraClipDistances(0.0106913, 10.6913);
+    // viz.setCameraPosition( 0.22543, 0.942367, -1.04499, 0.0702978, 0.317386, -0.0205721, 0.0647538, -0.85621, -0.512554);
+    // viz.setCameraFieldOfView(0.5);
+    // viz.setSize(960, 716);
+    // viz.setPosition(250, 52);
+
     viz.setBackgroundColor(0, 0, 0);
-    viz.setCameraClipDistances(0.0106913, 2);
-    viz.setCameraPosition( 0, 0, 1, 0.25, 0, 0.57, 0.43, 0, 1.25);
-    viz.setCameraFieldOfView(1);
+    viz.setCameraClipDistances(0.00884782, 8);
+    viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
+    viz.setCameraFieldOfView(0.7);
     viz.setSize(960, 716);
-    viz.setPosition(250, 52);
+    viz.setPosition(250, 52);    
       
     if (!cloud_pass_)
     {
@@ -397,7 +404,8 @@ public:
     FPS_CALC_BEGIN;
     pcl::PassThrough<PointType> pass;
     pass.setFilterFieldName ("z");
-    pass.setFilterLimits (-1, 1);
+    // pass.setFilterLimits (-1, 1);
+    pass.setFilterLimits (0,10);
     pass.setKeepOrganized (false);
     pass.setInputCloud (cloud);
     pass.filter (result);
@@ -461,37 +469,27 @@ public:
 
     std::cerr << "cloud : " << cloud->width * cloud->height << " data points." << std::endl;
     
+    FPS_CALC_BEGIN;        
+
     double start = pcl::getTime ();
-    FPS_CALC_BEGIN;
-
-    // Transform PointCloud2 from kinect frame to base frame
-    sensor_msgs::PointCloud2 cloud_tf;  
-
-    tf2_ros::Buffer tfBuffer;
-    tf2_ros::TransformListener listener(tfBuffer);
-    std::string in_frame = "base";
-    std::string out_frame = "kinect2_rgb_optical_frame";
-    geometry_msgs::TransformStamped transformStamped;
-
-    try{
-      ros::Time now = ros::Time::now();
-      transformStamped = tfBuffer.lookupTransform(in_frame,
-                                                  out_frame,
-                                                  ros::Time(0),
-                                                  ros::Duration(3.0));
-      //std::cout << transformStamped << std::endl;
-      tf2::doTransform(*cloud, cloud_tf, transformStamped);
+    double end;
+    if (print_time_){
+      start = pcl::getTime ();      
     }
-    catch(tf2::TransformException& ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
-    }
-
+    
     // From PointCloud2 to PCL point cloud
     pcl::PCLPointCloud2 pcl_pc2;
-    pcl_conversions::toPCL(cloud_tf,pcl_pc2);
+    pcl_conversions::toPCL(*cloud,pcl_pc2);
     pcl::PointCloud<RefPointType>::Ptr cloud_tf_pcl(new pcl::PointCloud<RefPointType>);
     pcl::fromPCLPointCloud2(pcl_pc2,*cloud_tf_pcl); 
     std::cerr << "cloud_tf_pcl : " << cloud_tf_pcl->width * cloud_tf_pcl->height << " data points." << std::endl;
+
+    if (print_time_){
+      end = pcl::getTime ();
+      double toPCL_time = end - start;
+      ROS_ERROR_STREAM("toPCL_time: " << toPCL_time);
+      start = pcl::getTime ();
+    }
 
     // light filter
     cloud_pass_.reset (new Cloud);
@@ -546,10 +544,16 @@ public:
     }
     
     new_cloud_ = true;
-    double end = pcl::getTime ();
+    end = pcl::getTime ();
     computation_time_ = end - start;
     FPS_CALC_END("computation");
     counter_++;
+
+    if (print_time_){
+      end = pcl::getTime ();
+      double others_time = end - start;
+      ROS_ERROR_STREAM("others_time: " << others_time);
+    }
 
     // Call viewer callback
     viz_cb(viewer_);
@@ -576,7 +580,6 @@ public:
     ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
     ros::spin ();
 
-    // while (!viewer_.wasStopped ())
     while (ros::ok())
       viewer_.spinOnce (100, true);
       boost::this_thread::sleep( boost::posix_time::milliseconds(100));
@@ -599,6 +602,7 @@ public:
   bool use_convex_hull_;
   bool visualize_non_downsample_;
   bool visualize_particles_;
+  bool print_time_;
   double tracking_time_;
   double computation_time_;
   double downsampling_time_;
@@ -610,8 +614,9 @@ main (int argc, char** argv)
 {
   bool use_convex_hull = true;
   bool visualize_non_downsample = true;
-  bool visualize_particles = true;
+  bool visualize_particles = false;
   bool use_fixed = false;
+  bool print_time = false;
 
   double downsampling_grid_size = 0.01;
   
@@ -621,6 +626,6 @@ main (int argc, char** argv)
   OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 16, downsampling_grid_size,
                                               use_convex_hull,
                                               visualize_non_downsample, visualize_particles,
-                                              use_fixed);
+                                              use_fixed, print_time);
   v.run (argc, argv);
 }

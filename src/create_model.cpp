@@ -28,7 +28,6 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   // Transform PointCloud2 from kinect frame to base frame
   sensor_msgs::PointCloud2 input_tf;  
 
-
   tf2_ros::Buffer tfBuffer;
   tf2_ros::TransformListener listener(tfBuffer);
   std::string in_frame = "base";
@@ -72,12 +71,38 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 
   std::cerr << "PointCloud after filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
 
+  ///// Transform back the reference frame
+
+  // From PCL point cloud to PointCloud2
+  sensor_msgs::PointCloud2 tmp_cloud_ros, tmp_cloud_ros_tf;
+  pcl::toROSMsg(*cloud_filteredX, tmp_cloud_ros);
+
+  // change frame
+  try{
+    ros::Time now = ros::Time::now();
+    transformStamped = tfBuffer.lookupTransform(out_frame, 
+                                                in_frame,
+                                                ros::Time(0),
+                                                ros::Duration(3.0));
+    //std::cout << transformStamped << std::endl;
+    tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
+  }
+  catch(tf2::TransformException& ex){
+      ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
+  }
+
+  // From PointCloud2 to PCL point cloud
+  pcl::PointCloud<PointType>::Ptr tmp_cloud_pcl_tf(new pcl::PointCloud<PointType>);
+  pcl_conversions::toPCL(tmp_cloud_ros_tf,pcl_pc2);
+  pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf); 
+
   // // Write the original version to disk
-  pcl::PCDWriter writer;
   // writer.write<PointType> ("src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
 
-  // Write the downsampled version to disk 
-  writer.write<PointType> (output_filename, *cloud_filteredX, false);
+  // Write the downsampled version to disk
+  pcl::PCDWriter writer;
+  // writer.write<PointType> (output_filename, *cloud_filteredX, false);
+  writer.write<PointType> (output_filename, *tmp_cloud_pcl_tf, false);
 
   ros::shutdown();
 }
