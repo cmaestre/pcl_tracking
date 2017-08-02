@@ -15,6 +15,14 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
 
+#include <pcl/ModelCoefficients.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/extract_clusters.h>
+
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2/transform_datatypes.h>
@@ -40,7 +48,7 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
                                                 out_frame,
                                                 ros::Time(0), 
                                                 ros::Duration(10.0));
-    std::cout << transformStamped << std::endl;
+    // std::cout << transformStamped << std::endl;
     tf2::doTransform(*input, input_tf, transformStamped);
   }
   catch(tf2::TransformException& ex){
@@ -55,7 +63,7 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 
   std::cerr << "PointCloud before filtering: " << input_tf_pcl->width * input_tf_pcl->height << " data points." << std::endl;
 
-  // Create the filtering object
+  // Planar filter
   pcl::PointCloud<PointType>::Ptr cloud_filteredZ (new pcl::PointCloud<PointType>);
   pcl::PointCloud<PointType>::Ptr cloud_filteredX (new pcl::PointCloud<PointType>);
   pcl::PointCloud<PointType>::Ptr cloud_filteredY (new pcl::PointCloud<PointType>);
@@ -75,7 +83,20 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   pass.setFilterLimits (0.65, 0.95);
   pass.filter (*cloud_filteredX);
 
-  std::cerr << "PointCloud after filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
+  std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
+
+  // Euclidean filter
+  pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
+  tree->setInputCloud (cloud_filteredX);
+
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> ec;
+  ec.setClusterTolerance (0.02); // 2cm
+  ec.setMinClusterSize (500);
+  ec.setMaxClusterSize (25000);
+  ec.setSearchMethod (tree);
+  ec.setInputCloud (cloud_filteredX);
+  ec.extract (cluster_indices);
 
   ///// Transform back the reference frame
 
@@ -106,8 +127,23 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   pcl::PCDWriter writer;
   writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
 
-  // Write the downsampled version to disk  
-  writer.write<PointType> (output_filename, *tmp_cloud_pcl_tf, false);
+  std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
+  int j = 0;
+  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+  {
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
+      cloud_cluster->points.push_back (tmp_cloud_pcl_tf->points[*pit]);
+    cloud_cluster->width = cloud_cluster->points.size ();
+    cloud_cluster->height = 1;
+    cloud_cluster->is_dense = true;
+
+    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size () << " data points." << std::endl;
+    std::stringstream ss;
+    ss << "/home/maestre/Desktop/cluster_examples/cloud_cluster_" << j << ".pcd";
+    writer.write<pcl::PointXYZRGBA> (ss.str (), *cloud_cluster, false); //*
+    j++;
+  }  
 
   ros::shutdown();
 }
@@ -115,18 +151,6 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 int
 main (int argc, char** argv)
 {
-  if (argc < 2)
-    {
-      PCL_WARN("Please set model name: roslaunch pcl_tracking run_create_model.launch model_name:=name \n");
-      exit (1);
-    }
-  else 
-    {
-      // std::ostringstream oss;
-      // oss << "src/pcl_tracking/src/" + std::string (argv[1]) + ".pcd";
-      // output_filename = oss.str();
-      output_filename = std::string (argv[1]);
-    }
 
   // Initialize ROS
   ros::init (argc, argv, "create_model");
@@ -134,8 +158,6 @@ main (int argc, char** argv)
 
   // Create a ROS subscriber for the input point cloud
   ros::Subscriber sub = nh.subscribe ("/kinect2/hd/points", 1, cloud_cb);
-  // ros::Subscriber sub = nh.subscribe<> ("/kinect2/hd/points", 1, 
-  //                                     boost::bind(cloud_cb, _1, output_filename));  
 
   // Spin
   ros::spin ();

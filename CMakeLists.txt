@@ -61,3 +61,6 @@ target_link_libraries (cluster_euclid ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable (example_extract_clusters_normals test/example_extract_clusters_normals.cpp)
 target_link_libraries (example_extract_clusters_normals ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (cluster_extraction test/cluster_extraction.cpp)
+target_link_libraries (cluster_extraction ${catkin_LIBRARIES} ${PCL_LIBRARIES})
