@@ -1,0 +1,30 @@
+# pcl tracking
+
+## Access topics through SSH
+
+## In B-01
+(for each terminal) 
+export ROS_MASTER_URI=http://BAXTER-01:11311
+export ROS_IP=134.157.18.209
+
+roscore
+
+roslaunch kinect2_bridge kinect2_bridge.launch
+
+rosrun rospy_tutorials listener.py
+
+## In my workstation
+(for each terminal) 
+export ROS_MASTER_URI=http://BAXTER-01:11311
+export ROS_IP=134.157.18.78
+
+rosrun rospy_tutorials talker.py
+
+(to check connection)
+rostopic echo /tf
+
+rosrun pcl_tracking XXX
+
+
+
+

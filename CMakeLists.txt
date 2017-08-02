@@ -50,3 +50,14 @@ target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable (auto_tracking src/auto_tracking.cpp)
 target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+## Tests
+
+add_executable (planar_segmentation test/planar_segmentation.cpp)
+target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (cluster_euclid test/cluster_euclid.cpp)
+target_link_libraries (cluster_euclid ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (example_extract_clusters_normals test/example_extract_clusters_normals.cpp)
+target_link_libraries (example_extract_clusters_normals ${catkin_LIBRARIES} ${PCL_LIBRARIES})

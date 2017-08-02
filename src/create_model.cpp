@@ -31,16 +31,16 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
   tf2_ros::Buffer tfBuffer;
   tf2_ros::TransformListener listener(tfBuffer);
   std::string in_frame = "base";
-  std::string out_frame = "kinect2_rgb_optical_frame";
+  std::string out_frame = "kinect2_link";
   geometry_msgs::TransformStamped transformStamped;
 
   try{
-    ros::Time now = ros::Time::now();
+    ros::Time now = ros::Time(0);
     transformStamped = tfBuffer.lookupTransform(in_frame, 
                                                 out_frame,
-                                                ros::Time(0),
-                                                ros::Duration(3.0));
-    //std::cout << transformStamped << std::endl;
+                                                ros::Time(0), 
+                                                ros::Duration(10.0));
+    std::cout << transformStamped << std::endl;
     tf2::doTransform(*input, input_tf, transformStamped);
   }
   catch(tf2::TransformException& ex){
@@ -85,11 +85,11 @@ void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 
   // change frame
   try{
-    ros::Time now = ros::Time::now();
+    ros::Time now = ros::Time(0);
     transformStamped = tfBuffer.lookupTransform(out_frame, 
                                                 in_frame,
-                                                ros::Time(0),
-                                                ros::Duration(3.0));
+                                                ros::Time(0), 
+                                                ros::Duration(10.0));
     //std::cout << transformStamped << std::endl;
     tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
   }
