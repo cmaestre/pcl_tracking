@@ -165,15 +165,20 @@ public:
             _service_response.push_back(temp_ros_cloud);
             j++;
         }
-
     }
+
+
+    void spin(){
+        ros::spinOnce();
+    }
+
+
 private:
     ros::NodeHandle _nh;
     ros::Subscriber _sub;
     ros::ServiceServer _service;
 
     std::vector<sensor_msgs::PointCloud2> _service_response;
-
 };
 
 
@@ -187,7 +192,12 @@ main (int argc, char** argv)
 
     object_model_creater models_creator;
 
+    ros::Rate rate(10);
     // Spin
+    while (ros::ok()) {
+       models_creator.spin();
+       rate.sleep();
+    }
     ros::spin ();
 
 }
