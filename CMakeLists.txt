@@ -20,14 +20,16 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
 )
 
-#add_service_files(
-#  FILES
-#)
+add_service_files(
+  FILES
+  ObjectCloud.srv
+)
 
-#generate_messages(
-#  DEPENDENCIES
-#  std_msgs
-#)
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+)
 
 catkin_package(
 #  INCLUDE_DIRS include

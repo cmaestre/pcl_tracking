@@ -39,6 +39,7 @@
 #include <iostream>
 #include <string>
 #include <sensor_msgs/PointCloud2.h>
+#include <pcl_tracking/ObjectCloud.h>
 
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -569,12 +570,19 @@ public:
     ros::init (argc, argv, "create_model");
     ros::NodeHandle nh;
 
-    // Load object to track (already in the base frame)
+    // Load object to track (in the camera frame)
     ref_cloud.reset(new Cloud());
     if(pcl::io::loadPCDFile (argv[1], *ref_cloud) == -1){
       std::cout << "pcd file not found" << std::endl;
       exit(-1);
     }  
+
+    // std::vector< CloudPtr > obj_cloud_vector;
+    // ros::serviceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("get_object_model");
+    // pcl_tracking::ObjectCloud srv;
+    // srv.request = 
+
+
 
     // Create a ROS subscriber for the input point cloud
     ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
@@ -589,7 +597,7 @@ public:
   pcl::visualization::PCLVisualizer viewer_ ;
   CloudPtr cloud_pass_;
   CloudPtr cloud_pass_downsampled_;
-  CloudPtr ref_cloud; // object cloud to track before translation
+  CloudPtr ref_cloud; // object cloud to track
   CloudPtr reference_;
   pcl::PointCloud<RefPointType>::Ptr tracked_cloud_;
   
@@ -621,7 +629,7 @@ main (int argc, char** argv)
   double downsampling_grid_size = 0.01;
   
   std::string device_id = "#1";
-  
+
   // open kinect
   OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 16, downsampling_grid_size,
                                               use_convex_hull,
