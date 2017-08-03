@@ -5,5 +5,5 @@
   <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/> 
 
   <arg name="model_name" />
-  <node name="pcl_tracking" pkg="pcl_tracking" type="create_model" output="screen"/> 
+  <node name="pcl_create_model" pkg="pcl_tracking" type="create_model" output="screen"/> 
 </launch>

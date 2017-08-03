@@ -40,24 +40,11 @@ public:
     void init(){
         _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this);
         _service = _nh.advertiseService("/get_object_model", &object_model_creater::get_object_model, this);
-
+        ROS_INFO("Ready to get Object Model");
     }
 
-    bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
-                          pcl_tracking::ObjectCloud::Response& res){
-        if(_service_response.empty()){
-            ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
-            return false;
-        }
-        else
-            res.cloud_vector = _service_response;
-        ROS_INFO_STREAM("There are objects clusters, and their number is: " << _service_response.size());
-        return true;
-    }
-
-    void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
-
-        _service_response.clear();
+    void porcess_cloud(){
+      _service_response.clear();
         // Transform PointCloud2 from kinect frame to base frame
         sensor_msgs::PointCloud2 input_tf;
 
@@ -74,7 +61,7 @@ public:
                                                         ros::Time(0),
                                                         ros::Duration(10.0));
             // std::cout << transformStamped << std::endl;
-            tf2::doTransform(*input, input_tf, transformStamped);
+            tf2::doTransform(_saved_cloud, input_tf, transformStamped);
         }
         catch(tf2::TransformException& ex){
             ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
@@ -166,6 +153,24 @@ public:
             j++;
         }
     }
+    bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
+                          pcl_tracking::ObjectCloud::Response& res){
+      porcess_cloud();
+        if(_service_response.empty()){
+            ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
+            return false;
+        }
+        else
+            res.cloud_vector = _service_response;
+        ROS_INFO_STREAM("There are objects clusters, and their number is: " << _service_response.size());
+        return true;
+    }
+
+    void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
+      _saved_cloud = *input;
+
+        
+    }
 
 
     void spin(){
@@ -178,6 +183,7 @@ private:
     ros::Subscriber _sub;
     ros::ServiceServer _service;
 
+    sensor_msgs::PointCloud2 _saved_cloud;
     std::vector<sensor_msgs::PointCloud2> _service_response;
 };
 
