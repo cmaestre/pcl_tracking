@@ -321,13 +321,6 @@ public:
   {
     // ROS_ERROR("Inside viz_cb");
 
-    // viz.setBackgroundColor(0, 0, 0);
-    // viz.setCameraClipDistances(0.0106913, 10.6913);
-    // viz.setCameraPosition( 0.22543, 0.942367, -1.04499, 0.0702978, 0.317386, -0.0205721, 0.0647538, -0.85621, -0.512554);
-    // viz.setCameraFieldOfView(0.5);
-    // viz.setSize(960, 716);
-    // viz.setPosition(250, 52);
-
     viz.setBackgroundColor(0, 0, 0);
     viz.setCameraClipDistances(0.00884782, 8);
     viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
@@ -387,16 +380,16 @@ public:
         
         ///// Bounding box
 
-        // Remove previous elements
-        viz.removeShape("cube");
-        viz.removeCoordinateSystem();
-
         // compute principal direction
-        // int obj_id;
+        int obj_id;
         RefCloudPtr tracked_cloud_;
         for (std::pair< int, RefCloudPtr > tracked_cloud_pair : tracked_cloud_dict) {
-          // obj_id = tracked_cloud_pair.first;
+          obj_id = tracked_cloud_pair.first;
           tracked_cloud_ = tracked_cloud_pair.second;
+
+          // Remove previous elements
+          viz.removeShape(std::to_string(obj_id));
+          viz.removeCoordinateSystem(std::to_string(obj_id));
 
           Eigen::Vector4f centroid;
           pcl::compute3DCentroid(*tracked_cloud_, centroid);   
@@ -420,7 +413,7 @@ public:
           const Eigen::Quaternionf qfinal(eigDx);
           const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
 
-          viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z);
+          viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, std::to_string(obj_id));
           viz.setRepresentationToWireframeForAllActors();
 
           // Compute position and orientation
@@ -432,7 +425,7 @@ public:
           Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
           trans = eigDx;
           trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
-          viz.addCoordinateSystem (0.25, trans);
+          viz.addCoordinateSystem (0.25, trans, std::to_string(obj_id));
         } // end for
       } // end if ret
     }
