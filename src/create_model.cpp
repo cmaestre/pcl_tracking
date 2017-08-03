@@ -27,126 +27,153 @@
 #include <tf2_ros/buffer.h>
 #include <tf2/transform_datatypes.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <pcl_tracking/ObjectCloud.h>
 
 typedef pcl::PointXYZRGBA PointType;
 std::string output_filename;
 
-void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
+class object_model_creater {
+public:
+    object_model_creater(){
+        init();
+    }
+    void init(){
+        _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this);
+        _service = _nh.advertiseService("/get_object_model", &object_model_creater::get_object_model, this);
 
-  // Transform PointCloud2 from kinect frame to base frame
-  sensor_msgs::PointCloud2 input_tf;  
+    }
 
-  tf2_ros::Buffer tfBuffer;
-  tf2_ros::TransformListener listener(tfBuffer);
-  std::string in_frame = "base";
-  std::string out_frame = "kinect2_link";
-  geometry_msgs::TransformStamped transformStamped;
+    bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
+                          pcl_tracking::ObjectCloud::Response& res){
+        if(_service_response.empty()){
+            ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
+            return false;
+        }
+        else
+            res.cloud_vector = _service_response;
+        return true;
+    }
 
-  try{
-    ros::Time now = ros::Time(0);
-    transformStamped = tfBuffer.lookupTransform(in_frame, 
-                                                out_frame,
-                                                ros::Time(0), 
-                                                ros::Duration(10.0));
-    // std::cout << transformStamped << std::endl;
-    tf2::doTransform(*input, input_tf, transformStamped);
-  }
-  catch(tf2::TransformException& ex){
-      ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
-  }
+    void cloud_cb(const boost::shared_ptr<const sensor_msgs::PointCloud2>& input){
 
-  // From PointCloud2 to PCL point cloud
-  pcl::PCLPointCloud2 pcl_pc2;
-  pcl_conversions::toPCL(input_tf,pcl_pc2);
-  pcl::PointCloud<PointType>::Ptr input_tf_pcl(new pcl::PointCloud<PointType>);
-  pcl::fromPCLPointCloud2(pcl_pc2,*input_tf_pcl); 
+      // Transform PointCloud2 from kinect frame to base frame
+      sensor_msgs::PointCloud2 input_tf;
 
-  std::cerr << "PointCloud before filtering: " << input_tf_pcl->width * input_tf_pcl->height << " data points." << std::endl;
+      tf2_ros::Buffer tfBuffer;
+      tf2_ros::TransformListener listener(tfBuffer);
+      std::string in_frame = "base";
+      std::string out_frame = "kinect2_link";
+      geometry_msgs::TransformStamped transformStamped;
 
-  // Planar filter
-  pcl::PointCloud<PointType>::Ptr cloud_filteredZ (new pcl::PointCloud<PointType>);
-  pcl::PointCloud<PointType>::Ptr cloud_filteredX (new pcl::PointCloud<PointType>);
-  pcl::PointCloud<PointType>::Ptr cloud_filteredY (new pcl::PointCloud<PointType>);
-  pcl::PassThrough<PointType> pass;
-  pass.setInputCloud (input_tf_pcl);
-  pass.setFilterFieldName ("z");
-  pass.setFilterLimits (-0.19, 0.2);
-  pass.filter (*cloud_filteredZ);
+      try{
+        ros::Time now = ros::Time(0);
+        transformStamped = tfBuffer.lookupTransform(in_frame,
+                                                    out_frame,
+                                                    ros::Time(0),
+                                                    ros::Duration(10.0));
+        // std::cout << transformStamped << std::endl;
+        tf2::doTransform(*input, input_tf, transformStamped);
+      }
+      catch(tf2::TransformException& ex){
+          ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
+      }
 
-  pass.setInputCloud (cloud_filteredZ);
-  pass.setFilterFieldName ("y");
-  pass.setFilterLimits (-0.25, 0.25);
-  pass.filter (*cloud_filteredY);
+      // From PointCloud2 to PCL point cloud
+      pcl::PCLPointCloud2 pcl_pc2;
+      pcl_conversions::toPCL(input_tf,pcl_pc2);
+      pcl::PointCloud<PointType>::Ptr input_tf_pcl(new pcl::PointCloud<PointType>);
+      pcl::fromPCLPointCloud2(pcl_pc2,*input_tf_pcl);
 
-  pass.setInputCloud (cloud_filteredY);
-  pass.setFilterFieldName ("x");
-  pass.setFilterLimits (0.65, 0.95);
-  pass.filter (*cloud_filteredX);
+      std::cerr << "PointCloud before filtering: " << input_tf_pcl->width * input_tf_pcl->height << " data points." << std::endl;
 
-  std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
+      // Planar filter
+      pcl::PointCloud<PointType>::Ptr cloud_filteredZ (new pcl::PointCloud<PointType>);
+      pcl::PointCloud<PointType>::Ptr cloud_filteredX (new pcl::PointCloud<PointType>);
+      pcl::PointCloud<PointType>::Ptr cloud_filteredY (new pcl::PointCloud<PointType>);
+      pcl::PassThrough<PointType> pass;
+      pass.setInputCloud (input_tf_pcl);
+      pass.setFilterFieldName ("z");
+      pass.setFilterLimits (-0.19, 0.2);
+      pass.filter (*cloud_filteredZ);
 
-  // Euclidean filter
-  pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
-  tree->setInputCloud (cloud_filteredX);
+      pass.setInputCloud (cloud_filteredZ);
+      pass.setFilterFieldName ("y");
+      pass.setFilterLimits (-0.25, 0.25);
+      pass.filter (*cloud_filteredY);
 
-  std::vector<pcl::PointIndices> cluster_indices;
-  pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> ec;
-  ec.setClusterTolerance (0.02); // 2cm
-  ec.setMinClusterSize (500);
-  ec.setMaxClusterSize (25000);
-  ec.setSearchMethod (tree);
-  ec.setInputCloud (cloud_filteredX);
-  ec.extract (cluster_indices);
+      pass.setInputCloud (cloud_filteredY);
+      pass.setFilterFieldName ("x");
+      pass.setFilterLimits (0.65, 0.95);
+      pass.filter (*cloud_filteredX);
 
-  ///// Transform back the reference frame
+      std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
 
-  // From PCL point cloud to PointCloud2
-  sensor_msgs::PointCloud2 tmp_cloud_ros, tmp_cloud_ros_tf;
-  pcl::toROSMsg(*cloud_filteredX, tmp_cloud_ros);
+      // Euclidean filter
+      pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
+      tree->setInputCloud (cloud_filteredX);
 
-  // change frame
-  try{
-    ros::Time now = ros::Time(0);
-    transformStamped = tfBuffer.lookupTransform(out_frame, 
-                                                in_frame,
-                                                ros::Time(0), 
-                                                ros::Duration(10.0));
-    //std::cout << transformStamped << std::endl;
-    tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
-  }
-  catch(tf2::TransformException& ex){
-      ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
-  }
+      std::vector<pcl::PointIndices> cluster_indices;
+      pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> ec;
+      ec.setClusterTolerance (0.02); // 2cm
+      ec.setMinClusterSize (500);
+      ec.setMaxClusterSize (25000);
+      ec.setSearchMethod (tree);
+      ec.setInputCloud (cloud_filteredX);
+      ec.extract (cluster_indices);
 
-  // From PointCloud2 to PCL point cloud
-  pcl::PointCloud<PointType>::Ptr tmp_cloud_pcl_tf(new pcl::PointCloud<PointType>);
-  pcl_conversions::toPCL(tmp_cloud_ros_tf,pcl_pc2);
-  pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf); 
+      ///// Transform back the reference frame
 
-  // // Write the original version to disk
-  pcl::PCDWriter writer;
-  writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *input_tf_pcl, false);
+      // From PCL point cloud to PointCloud2
+      sensor_msgs::PointCloud2 tmp_cloud_ros, tmp_cloud_ros_tf;
+      pcl::toROSMsg(*cloud_filteredX, tmp_cloud_ros);
 
-  std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
-  int j = 0;
-  for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
-  {
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGBA>);
-    for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
-      cloud_cluster->points.push_back (tmp_cloud_pcl_tf->points[*pit]);
-    cloud_cluster->width = cloud_cluster->points.size ();
-    cloud_cluster->height = 1;
-    cloud_cluster->is_dense = true;
+      // change frame
+      try{
+        ros::Time now = ros::Time(0);
+        transformStamped = tfBuffer.lookupTransform(out_frame,
+                                                    in_frame,
+                                                    ros::Time(0),
+                                                    ros::Duration(10.0));
+        //std::cout << transformStamped << std::endl;
+        tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
+      }
+      catch(tf2::TransformException& ex){
+          ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
+      }
 
-    std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size () << " data points." << std::endl;
-    std::stringstream ss;
-    ss << "/home/maestre/Desktop/cluster_examples/cloud_cluster_" << j << ".pcd";
-    writer.write<pcl::PointXYZRGBA> (ss.str (), *cloud_cluster, false); //*
-    j++;
-  }  
+      // From PointCloud2 to PCL point cloud
+      pcl::PointCloud<PointType>::Ptr tmp_cloud_pcl_tf(new pcl::PointCloud<PointType>);
+      pcl_conversions::toPCL(tmp_cloud_ros_tf,pcl_pc2);
+      pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf);
 
-  ros::shutdown();
-}
+      std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
+      int j = 0;
+      for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+      {
+        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGBA>);
+        for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
+          cloud_cluster->points.push_back (tmp_cloud_pcl_tf->points[*pit]);
+        cloud_cluster->width = cloud_cluster->points.size ();
+        cloud_cluster->height = 1;
+        cloud_cluster->is_dense = true;
+
+        sensor_msgs::PointCloud2 temp_ros_cloud;
+        pcl::toROSMsg(*cloud_cluster, temp_ros_cloud);
+
+        _service_response.push_back(temp_ros_cloud);
+        j++;
+      }
+
+    }
+private:
+    ros::NodeHandle _nh;
+    ros::Subscriber _sub;
+    ros::ServiceServer _service;
+
+    std::vector<sensor_msgs::PointCloud2> _service_response;
+
+};
+
 
 int
 main (int argc, char** argv)
@@ -156,8 +183,7 @@ main (int argc, char** argv)
   ros::init (argc, argv, "create_model");
   ros::NodeHandle nh;
 
-  // Create a ROS subscriber for the input point cloud
-  ros::Subscriber sub = nh.subscribe ("/kinect2/hd/points", 1, cloud_cb);
+  object_model_creater models_creator;
 
   // Spin
   ros::spin ();
