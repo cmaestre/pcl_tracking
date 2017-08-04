@@ -1,0 +1,1 @@
+geometry_msgs/PointStamped[] object_position
