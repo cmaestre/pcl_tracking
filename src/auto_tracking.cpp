@@ -102,7 +102,7 @@
 #include <boost/format.hpp>
 #include <pcl_tracking/ObjectPosition.h>
 
-int nb_wait_iter = 2;
+unsigned nb_wait_iter = 2;
 
 #define FPS_CALC_BEGIN                          \
     static double duration = 0;                 \
@@ -154,7 +154,8 @@ public:
                            bool use_convex_hull,
                            bool visualize_non_downsample,
                            bool visualize_particles,
-                           bool use_fixed, bool print_time)
+                           bool use_fixed, bool print_time,
+                           ros::NodeHandle n)
         : viewer_ ("PCL OpenNI Tracking Viewer")
         , device_id_ (device_id)
         , new_cloud_ (false)
@@ -167,6 +168,7 @@ public:
         , use_fixed_ (use_fixed)
         , thread_nr_ (thread_nr)
         , downsampling_grid_size_ (downsampling_grid_size)
+        , nh(n)
     {
     }
 
@@ -384,9 +386,9 @@ public:
                 // compute principal direction
                 int obj_id;
                 RefCloudPtr tracked_cloud_;
-                std::vector < std::vector <double > > positions_in_camera_frame;
+                std::vector < std::pair< int, std::vector<double> > > obj_pos_vector;
                 std::vector < std::vector <double > > positions_in_base_frame;
-                _objects_positions_msg.object_position.clear();
+                std::pair< int, std::vector<double> > centroid_vector;                
                 for (std::pair< int, RefCloudPtr > tracked_cloud_pair : tracked_cloud_dict) {
                     obj_id = tracked_cloud_pair.first;
                     tracked_cloud_ = tracked_cloud_pair.second;
@@ -422,14 +424,12 @@ public:
 
                     viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, std::to_string(obj_id));
                     viz.setRepresentationToWireframeForAllActors();
-
-                    // Compute position and orientation
+                    
                     Eigen::Vector3f centroids = centroid.head<3>();
-                    ROS_ERROR_STREAM("Object " << obj_id << " : " <<
-                                     centroids[0] << " " <<
-                                                     centroids[1] << " " <<
-                                                     centroids[2]);
-                    positions_in_camera_frame.push_back({centroid[0], centroid[1], centroid[2]});
+                    std::pair< int, std::vector<double> > curr_centroid;
+                    std::vector<double> tmp = {centroid[0], centroid[1], centroid[2]};
+                    curr_centroid = std::make_pair(obj_id, tmp);
+                    obj_pos_vector.push_back(curr_centroid);
 
                     Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
                     trans = eigDx;
@@ -443,15 +443,25 @@ public:
                     //              centroids[0], centroids[1], 5, 1.0, 1.0, 1.0, obj_name);
 
                 } // end for
-                tf_base_conversion(positions_in_camera_frame, positions_in_base_frame);
-                for(size_t i = 0; i < positions_in_base_frame.size(); i++){
+                tf_base_conversion(obj_pos_vector);
+                _objects_positions_msg.object_position.clear();
+                for(size_t i = 0; i < obj_pos_vector.size(); i++){
                     geometry_msgs::PointStamped point;
                     point.header.stamp = ros::Time::now();
                     point.header.frame_id = "/base";
-                    point.point.x = positions_in_base_frame[i][0];
-                    point.point.y = positions_in_base_frame[i][1];
-                    point.point.z = positions_in_base_frame[i][2];
+                    int tmp_id = obj_pos_vector[i].first;
+                    std::vector<double> tmp_pos = obj_pos_vector[i].second;
+                    point.point.x = tmp_pos[0];
+                    point.point.y = tmp_pos[1];
+                    point.point.z = tmp_pos[2];
+                    point.header.seq = tmp_id;
                     _objects_positions_msg.object_position.push_back(point);
+                    // Compute position and orientation
+                    ROS_ERROR_STREAM("Object " << tmp_id << " : " <<
+                                                    tmp_pos[0] << " " <<
+                                                    tmp_pos[1] << " " <<
+                                                    tmp_pos[2]);
+
                 }
                 _objects_positions_pub.publish(_objects_positions_msg);
             } // end if ret
@@ -460,17 +470,16 @@ public:
 
     }
 
-    void tf_base_conversion(std::vector<std::vector<double>>& position_in,
-                            std::vector<std::vector<double>>& position_out){
+    void tf_base_conversion(std::vector< std::pair< int, std::vector<double> > >& position_in){
         if(position_in.empty()){
             ROS_ERROR("THE TRANSFORMATION IS IMPOSSIBLE, EMPTY VECTOR");
             return;
         }
-        position_out.resize(position_in.size());
+        // position_out.resize(position_in.size());
         //ROS_INFO("Converting point into robot frame ...");
         tf::TransformListener listener;
         tf::StampedTransform stamped_transform;
-        std::string child_frame = "/kinect2_rgb_optical_frame";
+        std::string child_frame = "/kinect2_link";
         std::string parent_frame = "/base";
         try{
             listener.lookupTransform(child_frame, parent_frame,
@@ -491,13 +500,15 @@ public:
             //we'll just use the most recent transform available for our simple example
             in_point[i].header.stamp = ros::Time();
 
-            in_point[i].point.x = position_in[i][0];
-            in_point[i].point.y = position_in[i][1];
-            in_point[i].point.z = position_in[i][2];
+            // int tmp_id = position_in[i].first;
+            std::vector<double> tmp_pos = position_in[i].second;
+            in_point[i].point.x = tmp_pos[0];
+            in_point[i].point.y = tmp_pos[1];
+            in_point[i].point.z = tmp_pos[2];
 
             try{
                 listener.transformPoint(parent_frame, in_point[i], out_point[i]);
-                ROS_INFO("kinect2_rgb_optical_frame: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
+                ROS_INFO("kinect2_link: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
                    in_point[i].point.x, in_point[i].point.y, in_point[i].point.z,
                    out_point[i].point.x, out_point[i].point.y, out_point[i].point.z, out_point[i].header.stamp.toSec());
             }
@@ -505,7 +516,7 @@ public:
                 ROS_ERROR("Received an exception trying to transform a point from \"camera_depth_optical_frame\" to \"world\": %s", ex.what());
             }
 
-            position_out[i] = {out_point[i].point.x, out_point[i].point.y, out_point[i].point.z};
+            position_in[i].second = {out_point[i].point.x, out_point[i].point.y, out_point[i].point.z};
         }
     }
 
@@ -739,8 +750,7 @@ public:
     }
 
     int nb_objects;
-
-    ros::NodeHandle nh;
+    
     ros::Publisher _objects_positions_pub;
     pcl_tracking::ObjectPosition _objects_positions_msg;
     pcl::visualization::PCLVisualizer viewer_ ;
@@ -756,7 +766,7 @@ public:
     boost::mutex mtx_;
     bool new_cloud_;
     pcl::NormalEstimationOMP<PointType, pcl::Normal> ne_; // to store threadpool
-    int counter_;
+    unsigned counter_;
     bool use_convex_hull_;
     bool visualize_non_downsample_;
     bool visualize_particles_;
@@ -767,6 +777,7 @@ public:
     double computation_time_;
     double downsampling_time_;
     double downsampling_grid_size_;
+    ros::NodeHandle nh;
 };
 
 int
@@ -781,11 +792,15 @@ main (int argc, char** argv)
     double downsampling_grid_size = 0.01;
 
     std::string device_id = "#1";
+    
+    // Initialize ROS
+    ros::init (argc, argv, "create_model");
+    ros::NodeHandle n;
 
     // open kinect
     OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 16, downsampling_grid_size,
                                                 use_convex_hull,
                                                 visualize_non_downsample, visualize_particles,
-                                                use_fixed, print_time);
+                                                use_fixed, print_time, n);
     v.run (argc, argv);
 }
