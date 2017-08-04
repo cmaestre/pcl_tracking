@@ -444,7 +444,7 @@ public:
 
                 } // end for
                 tf_base_conversion(obj_pos_vector);
-                _objects_positions_msg.object_position.clear();
+                obj_pos_msg_.object_position.clear();
                 for(size_t i = 0; i < obj_pos_vector.size(); i++){
                     geometry_msgs::PointStamped point;
                     point.header.stamp = ros::Time::now();
@@ -455,7 +455,7 @@ public:
                     point.point.y = tmp_pos[1];
                     point.point.z = tmp_pos[2];
                     point.header.seq = tmp_id;
-                    _objects_positions_msg.object_position.push_back(point);
+                    obj_pos_msg_.object_position.push_back(point);
                     // Compute position and orientation
                     ROS_ERROR_STREAM("Object " << tmp_id << " : " <<
                                                     tmp_pos[0] << " " <<
@@ -463,7 +463,7 @@ public:
                                                     tmp_pos[2]);
 
                 }
-                _objects_positions_pub.publish(_objects_positions_msg);
+                _objects_positions_pub.publish(obj_pos_msg_);
             } // end if ret
         }
         new_cloud_ = false;
@@ -713,9 +713,9 @@ public:
         //   exit(-1);
         // }
 
-        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/object_position", 1);
+        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/object_position", 1);
         std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
-        ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("get_object_model");
+        ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model");
         pcl_tracking::ObjectCloud srv;
         if (client.call(srv))
         {
@@ -752,7 +752,7 @@ public:
     int nb_objects;
     
     ros::Publisher _objects_positions_pub;
-    pcl_tracking::ObjectPosition _objects_positions_msg;
+    pcl_tracking::ObjectPosition obj_pos_msg_;
     pcl::visualization::PCLVisualizer viewer_ ;
     CloudPtr cloud_pass_;
     CloudPtr cloud_pass_downsampled_;

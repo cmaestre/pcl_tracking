@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <sensor_msgs/PointCloud2.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
@@ -39,7 +40,7 @@ public:
     }
     void init(){
         _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this);
-        _service = _nh.advertiseService("/get_object_model", &object_model_creater::get_object_model, this);
+        _service = _nh.advertiseService("/visual/get_object_model", &object_model_creater::get_object_model, this);
         ROS_INFO("Ready to get Object Model");
     }
 
@@ -63,8 +64,20 @@ public:
       result->is_dense = true;
     }
 
-    void porcess_cloud(){
-      _service_response.clear();
+    void process_cloud(){
+        // Create folder to store the generated model clouds
+        const boost::posix_time::ptime time = boost::posix_time::second_clock::universal_time();
+
+        std::string str_time = boost::posix_time::to_simple_string(time);
+
+        std::string full_path = "/home/maestre/baxter_ws/src/pcl_tracking/models/" + str_time;
+        boost::filesystem::path dir(full_path);
+        if(!boost::filesystem::create_directory(dir)){
+            ROS_ERROR("The folder to store the models was not created.");
+            return;
+        }
+
+        _service_response.clear();
         // Transform PointCloud2 from kinect frame to base frame
         sensor_msgs::PointCloud2 input_tf;
 
@@ -165,6 +178,8 @@ public:
         pcl::fromPCLPointCloud2(pcl_pc2,*tmp_cloud_pcl_tf);
 
         std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
+
+        pcl::PCDWriter writer;
         int j = 0;
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
@@ -175,6 +190,12 @@ public:
             cloud_cluster->height = 1;
             cloud_cluster->is_dense = true;
 
+            // Write model files
+            std::stringstream ss;
+            ss << full_path << "/" << j << ".pcd";
+            writer.write<pcl::PointXYZRGBA> (ss.str (), *cloud_cluster, false);
+
+            // Expose models
             sensor_msgs::PointCloud2 temp_ros_cloud;
             pcl::toROSMsg(*cloud_cluster, temp_ros_cloud);
 
@@ -184,7 +205,7 @@ public:
     }
     bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
                           pcl_tracking::ObjectCloud::Response& res){
-      porcess_cloud();
+      process_cloud();
         if(_service_response.empty()){
             ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
             return false;
@@ -220,7 +241,6 @@ private:
 int
 main (int argc, char** argv)
 {
-
     // Initialize ROS
     ros::init (argc, argv, "create_model");
     ros::NodeHandle nh;
