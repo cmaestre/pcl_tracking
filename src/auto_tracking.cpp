@@ -354,7 +354,7 @@ public:
         drawResult (viz);
         
         // draw some texts
-        viz.removeShape ("N");
+        // viz.removeShape ("N");
         // viz.addText ((boost::format ("number of Reference PointClouds: %d") % tracker_->getReferenceCloud ()->points.size ()).str (),
         //              10, 20, 20, 1.0, 1.0, 1.0, "N");
         
@@ -387,6 +387,9 @@ public:
           obj_id = tracked_cloud_pair.first;
           tracked_cloud_ = tracked_cloud_pair.second;
 
+          // print ID
+
+
           // Remove previous elements
           viz.removeShape(std::to_string(obj_id));
           viz.removeCoordinateSystem(std::to_string(obj_id));
@@ -418,7 +421,7 @@ public:
 
           // Compute position and orientation
           Eigen::Vector3f centroids = centroid.head<3>();
-          ROS_ERROR_STREAM("Tracked object position: " <<  
+          ROS_ERROR_STREAM("Object " << obj_id << " : " <<  
                             centroids[0] << " " << 
                             centroids[1] << " " << 
                             centroids[2]);
@@ -426,6 +429,13 @@ public:
           trans = eigDx;
           trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
           viz.addCoordinateSystem (0.25, trans, std::to_string(obj_id));
+
+          // // print ID (TBD)
+          // std::string obj_name = "obj_" + std::to_string(obj_id);
+          // viz.removeShape (obj_name);
+          // viz.addText (std::to_string(obj_id),
+          //              centroids[0], centroids[1], 5, 1.0, 1.0, 1.0, obj_name); 
+
         } // end for
       } // end if ret
     }

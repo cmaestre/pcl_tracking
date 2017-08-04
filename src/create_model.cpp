@@ -34,13 +34,33 @@ std::string output_filename;
 
 class object_model_creater {
 public:
-    object_model_creater(){
+    object_model_creater(ros::NodeHandle nh) : _nh(nh){
         init();
     }
     void init(){
         _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this);
         _service = _nh.advertiseService("/get_object_model", &object_model_creater::get_object_model, this);
         ROS_INFO("Ready to get Object Model");
+    }
+
+    void removeZeroPoints (const pcl::PointCloud<PointType>::Ptr &cloud,
+                           pcl::PointCloud<PointType>::Ptr &result)
+    {
+      for (size_t i = 0; i < cloud->points.size (); i++)
+      {
+        PointType point = cloud->points[i];
+        if (!(fabs(point.x) < 0.01 &&
+              fabs(point.y) < 0.01 &&
+              fabs(point.z) < 0.01) &&
+            !pcl_isnan(point.x) &&
+            !pcl_isnan(point.y) &&
+            !pcl_isnan(point.z))
+          result->points.push_back(point);
+      }
+
+      result->width = static_cast<pcl::uint32_t> (result->points.size ());
+      result->height = 1;
+      result->is_dense = true;
     }
 
     void porcess_cloud(){
@@ -72,27 +92,36 @@ public:
         pcl_conversions::toPCL(input_tf,pcl_pc2);
         pcl::PointCloud<PointType>::Ptr input_tf_pcl(new pcl::PointCloud<PointType>);
         pcl::fromPCLPointCloud2(pcl_pc2,*input_tf_pcl);
+        pcl::PointCloud<PointType>::Ptr input_tf_pcl_non_zero (new pcl::PointCloud<PointType>);
+        removeZeroPoints(input_tf_pcl, input_tf_pcl_non_zero);
 
-        std::cerr << "PointCloud before filtering: " << input_tf_pcl->width * input_tf_pcl->height << " data points." << std::endl;
+        std::cerr << "PointCloud before filtering: " << input_tf_pcl_non_zero->width * input_tf_pcl_non_zero->height << " data points." << std::endl;
 
         // Planar filter
+        double x_min; _nh.getParam("segm_limits/x/min", x_min);
+        double x_max; _nh.getParam("segm_limits/x/max", x_max);
+        double y_min; _nh.getParam("segm_limits/y/min", y_min);
+        double y_max; _nh.getParam("segm_limits/y/max", y_max);
+        double z_min; _nh.getParam("segm_limits/z/min", z_min);
+        double z_max; _nh.getParam("segm_limits/z/max", z_max);
+
         pcl::PointCloud<PointType>::Ptr cloud_filteredZ (new pcl::PointCloud<PointType>);
         pcl::PointCloud<PointType>::Ptr cloud_filteredX (new pcl::PointCloud<PointType>);
         pcl::PointCloud<PointType>::Ptr cloud_filteredY (new pcl::PointCloud<PointType>);
         pcl::PassThrough<PointType> pass;
-        pass.setInputCloud (input_tf_pcl);
+        pass.setInputCloud (input_tf_pcl_non_zero);
         pass.setFilterFieldName ("z");
-        pass.setFilterLimits (-0.19, 0.2);
+        pass.setFilterLimits (z_min, z_max);
         pass.filter (*cloud_filteredZ);
 
         pass.setInputCloud (cloud_filteredZ);
         pass.setFilterFieldName ("y");
-        pass.setFilterLimits (-0.25, 0.25);
+        pass.setFilterLimits (y_min, y_max);
         pass.filter (*cloud_filteredY);
 
         pass.setInputCloud (cloud_filteredY);
         pass.setFilterFieldName ("x");
-        pass.setFilterLimits (0.65, 0.95);
+        pass.setFilterLimits (x_min, x_max);
         pass.filter (*cloud_filteredX);
 
         std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
@@ -196,7 +225,7 @@ main (int argc, char** argv)
     ros::init (argc, argv, "create_model");
     ros::NodeHandle nh;
 
-    object_model_creater models_creator;
+    object_model_creater models_creator(nh);
 
     ros::Rate rate(10);
     // Spin

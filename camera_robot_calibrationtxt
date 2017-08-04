@@ -1,0 +1,7 @@
+At time 1501772525.577
+- Translation: [1.365, 0.067, 0.712]
+- Rotation: in Quaternion [-0.444, 0.001, 0.896, -0.002]
+            in RPY (radian) [0.005, 0.919, -3.134]
+            in RPY (degree) [0.296, 52.677, -179.559]
+
+rosrun tf static_transform_publisher 1.4 0.037 0.6 -0.444 0.001 0.896 -0.002 /world /camera_link 100
