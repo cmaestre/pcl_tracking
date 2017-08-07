@@ -713,9 +713,9 @@ public:
         //   exit(-1);
         // }
 
-        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/object_position", 1);
+        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1);
         std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
-        ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model");
+        ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model_vector");
         pcl_tracking::ObjectCloud srv;
         if (client.call(srv))
         {

@@ -39,8 +39,8 @@ public:
         init();
     }
     void init(){
-        _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this);
-        _service = _nh.advertiseService("/visual/get_object_model", &object_model_creater::get_object_model, this);
+        _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this); // input
+        _service = _nh.advertiseService("/visual/get_object_model_vector", &object_model_creater::get_object_model, this); // output
         ROS_INFO("Ready to get Object Model");
     }
 
