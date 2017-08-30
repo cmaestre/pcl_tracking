@@ -41,6 +41,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_tracking/ObjectCloud.h>
 
+#include <baxter_kinematics/RestartRobot.h>
+
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2/transform_datatypes.h>
@@ -741,7 +743,8 @@ public:
         initialize_trackers(); // one tracker per object
 
         // Create a ROS subscriber for the input point cloud
-        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+//        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
         ros::spin ();
 
         while (ros::ok())
@@ -796,6 +799,18 @@ main (int argc, char** argv)
     // Initialize ROS
     ros::init (argc, argv, "create_model");
     ros::NodeHandle n;
+
+    // Restart robot position
+    ros::ServiceClient client = n.serviceClient<baxter_kinematics::RestartRobot>("/baxter_kinematics/restart_robot");
+    baxter_kinematics::RestartRobot srv;
+    if (client.call(srv))
+    {
+        ROS_INFO("Restarting robot position");
+    }
+    else
+    {
+        ROS_ERROR("Restarting robot position failed");
+    }
 
     // open kinect
     OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 16, downsampling_grid_size,

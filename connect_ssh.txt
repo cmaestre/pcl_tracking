@@ -5,7 +5,7 @@
 ## In B-01
 (for each terminal) 
 export ROS_MASTER_URI=http://BAXTER-01:11311
-export ROS_IP=134.157.18.209
+export ROS_IP=134.157.18.78
 
 roscore
 
@@ -16,7 +16,7 @@ rosrun rospy_tutorials listener.py
 ## In my workstation
 (for each terminal) 
 export ROS_MASTER_URI=http://BAXTER-01:11311
-export ROS_IP=134.157.18.78
+export ROS_IP=134.157.18.209
 
 rosrun rospy_tutorials talker.py
 
