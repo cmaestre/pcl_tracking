@@ -3,12 +3,19 @@
 
 
   <!--For kinect 2 infront of baxter-->
-  <arg name="camera_link_pose" default="1.64338 -0.613543 0.653758 0.780143 0.470263 -0.225231 -0.322061"/>
+  <!--arg name="camera_link_pose" default="1.64338 -0.613543 0.653758 0.780143 0.470263 -0.225231 -0.322061"/-->
+  
   <!--For kinect 2 on head of baxter-->
   <!--arg name="camera_link_pose" default="0.227452 -0.0841643 0.87455 0.69823 -0.678333 0.149447 -0.185532"/-->
-  <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/> 
+
+  <!--node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/--> 
+
+  <!--For kinect 1 in simulation-->
+  <!--arg name="camera_link_pose" default="2.4 0 0.6 0 0.7 -3.14"/>  
+
+  <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /camera_depth_optical_frame 100"/-->   
 
   <rosparam command="load" file="$(find pcl_tracking)/src/params.yaml"/>
 
-  <node name="pcl_create_model" pkg="pcl_tracking" type="create_model" output="screen"/> 
+  <node name="pcl_create_model" pkg="pcl_tracking" type="create_model"  output="screen"/> 
 </launch>

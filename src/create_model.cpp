@@ -39,9 +39,23 @@ public:
         init();
     }
     void init(){
-        _sub = _nh.subscribe ("/kinect2/hd/points", 1, &object_model_creater::cloud_cb, this); // input
-        _service = _nh.advertiseService("/visual/get_object_model_vector", &object_model_creater::get_object_model, this); // output
-        ROS_INFO("Ready to get Object Model");
+
+//        try {
+            bool real_robot;
+            std::string cloud_topic_name;
+            _nh.getParam("real_robot", real_robot);
+            if (!real_robot) // SIM
+                cloud_topic_name = "/camera/depth_registered/sw_registered/points";
+            else // REAL
+                cloud_topic_name = "/kinect2/hd/points";
+            _sub = _nh.subscribe (cloud_topic_name, 1, &object_model_creater::cloud_cb, this); // input
+            _service = _nh.advertiseService("/visual/get_object_model_vector", &object_model_creater::get_object_model, this); // output
+            ROS_INFO("Ready to get Object Model");
+//            usleep(15e6);
+//            process_cloud();
+//        } catch (int e) {
+//          ROS_ERROR("An exception occurred during the initialization");
+//        }
     }
 
     void removeZeroPoints (const pcl::PointCloud<PointType>::Ptr &cloud,
@@ -65,6 +79,8 @@ public:
     }
 
     void process_cloud(){
+        _service_response.clear();
+
         // Create folder to store the generated model clouds
         const boost::posix_time::ptime time = boost::posix_time::second_clock::universal_time();
 
@@ -77,16 +93,21 @@ public:
             return;
         }
 
-        _service_response.clear();
-        // Transform PointCloud2 from kinect frame to base frame
+        // Frame transformation
         sensor_msgs::PointCloud2 input_tf;
-
+        std::string in_frame = "base";
+        std::string out_frame;
+        bool real_robot;
+        _nh.getParam("real_robot", real_robot);
+        if (real_robot) // REAL
+            out_frame = "kinect2_link";
+        else  // SIM
+            out_frame = "camera_depth_optical_frame";
         tf2_ros::Buffer tfBuffer;
         tf2_ros::TransformListener listener(tfBuffer);
-        std::string in_frame = "base";
-        std::string out_frame = "kinect2_link";
         geometry_msgs::TransformStamped transformStamped;
 
+        // Transform PointCloud2 from kinect frame to base frame
         try{
             ros::Time now = ros::Time(0);
             transformStamped = tfBuffer.lookupTransform(in_frame,
@@ -139,6 +160,10 @@ public:
 
         std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
 
+        // // Write the original version to disk
+        pcl::PCDWriter writer;
+        writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *cloud_filteredX, false);
+
         // Euclidean filter
         pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
         tree->setInputCloud (cloud_filteredX);
@@ -158,18 +183,22 @@ public:
         sensor_msgs::PointCloud2 tmp_cloud_ros, tmp_cloud_ros_tf;
         pcl::toROSMsg(*cloud_filteredX, tmp_cloud_ros);
 
-        // change frame
-        try{
-            ros::Time now = ros::Time(0);
-            transformStamped = tfBuffer.lookupTransform(out_frame,
-                                                        in_frame,
-                                                        ros::Time(0),
-                                                        ros::Duration(10.0));
-            //std::cout << transformStamped << std::endl;
-            tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
-        }
-        catch(tf2::TransformException& ex){
-            ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
+        if (real_robot){ // REAL
+            // change frame
+            try{
+                ros::Time now = ros::Time(0);
+                transformStamped = tfBuffer.lookupTransform(out_frame,
+                                                            in_frame,
+                                                            ros::Time(0),
+                                                            ros::Duration(10.0));
+                //std::cout << transformStamped << std::endl;
+                tf2::doTransform(tmp_cloud_ros, tmp_cloud_ros_tf, transformStamped);
+            }
+            catch(tf2::TransformException& ex){
+                ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
+            }
+        } else { // SIM
+            tmp_cloud_ros_tf = tmp_cloud_ros;
         }
 
         // From PointCloud2 to PCL point cloud
@@ -179,7 +208,7 @@ public:
 
         std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
 
-        pcl::PCDWriter writer;
+//        pcl::PCDWriter writer;
         int j = 0;
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
@@ -203,9 +232,12 @@ public:
             j++;
         }
     }
+
+
     bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
                           pcl_tracking::ObjectCloud::Response& res){
-      process_cloud();
+ROS_ERROR("get_object_model");
+        process_cloud();
         if(_service_response.empty()){
             ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
             return false;
@@ -242,16 +274,18 @@ int
 main (int argc, char** argv)
 {
     // Initialize ROS
+ROS_ERROR("0");
     ros::init (argc, argv, "create_model");
     ros::NodeHandle nh;
-
+ROS_ERROR("1");
     object_model_creater models_creator(nh);
-
+ROS_ERROR("2");
     ros::Rate rate(10);
     // Spin
     while (ros::ok()) {
        models_creator.spin();
        rate.sleep();
+
     }
     ros::spin ();
 
