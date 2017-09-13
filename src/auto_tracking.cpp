@@ -40,6 +40,9 @@
 #include <string>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_tracking/ObjectCloud.h>
+#include <pcl_tracking/ObjectPosition.h>
+#include <chrono>
+#include <ctime>
 
 #include <baxter_kinematics/RestartRobot.h>
 
@@ -47,6 +50,8 @@
 #include <tf2_ros/buffer.h>
 #include <tf2/transform_datatypes.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h> 
+#include <tf/transform_broadcaster.h>
+#include <tf2_msgs/TFMessage.h>
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
@@ -102,7 +107,6 @@
 #include <pcl/common/transforms.h>
 
 #include <boost/format.hpp>
-#include <pcl_tracking/ObjectPosition.h>
 
 unsigned nb_wait_iter = 2;
 
@@ -326,6 +330,14 @@ public:
     {
         // ROS_ERROR("Inside viz_cb");
 
+        std::chrono::time_point<std::chrono::high_resolution_clock> viz_init;
+        if (print_time_)
+            viz_init = std::chrono::high_resolution_clock::now();
+
+        std::chrono::time_point<std::chrono::high_resolution_clock> viz_setup;
+        if (print_time_)
+            viz_setup = std::chrono::high_resolution_clock::now();
+
         viz.setBackgroundColor(0, 0, 0);
         viz.setCameraClipDistances(0.00884782, 8);
         viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
@@ -351,17 +363,22 @@ public:
             }
         }
 
+        if (print_time_){
+            auto viz_setup_end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> viz_setup_time = viz_setup_end - viz_setup;
+            ROS_WARN_STREAM("viz_setup time: " << viz_setup_time.count() << " seconds");
+        }
+
         if (new_cloud_ && (reference_dict.size() > 0) )
         {
+            std::chrono::time_point<std::chrono::high_resolution_clock> viz_draw;
+            if (print_time_)
+                viz_draw = std::chrono::high_resolution_clock::now();
+
             bool ret = drawParticles (viz);
             if (ret)
-            {
+            {                
                 drawResult (viz);
-
-                // draw some texts
-                // viz.removeShape ("N");
-                // viz.addText ((boost::format ("number of Reference PointClouds: %d") % tracker_->getReferenceCloud ()->points.size ()).str (),
-                //              10, 20, 20, 1.0, 1.0, 1.0, "N");
 
                 viz.removeShape ("M");
                 viz.addText ((boost::format ("number of Measured PointClouds:  %d") % cloud_pass_downsampled_->points.size ()).str (),
@@ -379,28 +396,38 @@ public:
                 viz.addText ((boost::format ("computation:     %f fps") % (1.0 / computation_time_)).str (),
                              10, 100, 20, 1.0, 1.0, 1.0, "computation");
 
-                // viz.removeShape ("particles");
-                // viz.addText ((boost::format ("particles:     %d") % tracker_->getParticles ()->points.size ()).str (),
-                //              10, 120, 20, 1.0, 1.0, 1.0, "particles");
+                if (print_time_){
+                    auto viz_draw_end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> viz_draw_time = viz_draw_end - viz_draw;
+                    ROS_WARN_STREAM("Total viz_draw time: " << viz_draw_time.count() << " seconds");
+                }
 
                 ///// Bounding box
+                std::chrono::time_point<std::chrono::high_resolution_clock> viz_pos;
+                if (print_time_)
+                    viz_pos = std::chrono::high_resolution_clock::now();
 
                 // compute principal direction
                 int obj_id;
                 RefCloudPtr tracked_cloud_;
                 std::vector < std::pair< int, std::vector<double> > > obj_pos_vector;
                 std::vector < std::vector <double > > positions_in_base_frame;
-                std::pair< int, std::vector<double> > centroid_vector;                
+                std::pair< int, std::vector<double> > centroid_vector;
                 for (std::pair< int, RefCloudPtr > tracked_cloud_pair : tracked_cloud_dict) {
                     obj_id = tracked_cloud_pair.first;
                     tracked_cloud_ = tracked_cloud_pair.second;
 
-                    // print ID
-
+                    // print ID (TBD)
 
                     // Remove previous elements
                     viz.removeShape(std::to_string(obj_id));
                     viz.removeCoordinateSystem(std::to_string(obj_id));
+
+                    if (print_time_){
+                        auto viz_tmp_1 = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_tmp_1_time = viz_tmp_1 - viz_pos;
+                        ROS_WARN_STREAM("Total viz_tmp_1 time: " << viz_tmp_1_time.count() << " seconds");
+                    }
 
                     Eigen::Vector4f centroid;
                     pcl::compute3DCentroid(*tracked_cloud_, centroid);
@@ -417,13 +444,18 @@ public:
                     pcl::PointCloud<RefPointType> cPoints;
                     pcl::transformPointCloud(*tracked_cloud_, cPoints, p2w);
 
+                    if (print_time_){
+                        auto viz_tmp_2 = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_tmp_2_time = viz_tmp_2 - viz_pos;
+                        ROS_WARN_STREAM("Total viz_tmp_2 time: " << viz_tmp_2_time.count() << " seconds");
+                    }
+
                     RefPointType min_pt, max_pt;
                     pcl::getMinMax3D(cPoints, min_pt, max_pt);
                     const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
                     // final transform
                     const Eigen::Quaternionf qfinal(eigDx);
                     const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
-
                     viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, std::to_string(obj_id));
                     viz.setRepresentationToWireframeForAllActors();
                     
@@ -433,24 +465,25 @@ public:
                     curr_centroid = std::make_pair(obj_id, tmp);
                     obj_pos_vector.push_back(curr_centroid);
 
-                    Eigen::Affine3f trans; // = Eigen::Affine3f::Identity ();
-                    trans = eigDx;
-                    trans.translation ().matrix () = Eigen::Vector3f (centroids[0], centroids[1], centroids[2]);
-                    viz.addCoordinateSystem (0.25, trans, std::to_string(obj_id));
-
-                    // // print ID (TBD)
-                    // std::string obj_name = "obj_" + std::to_string(obj_id);
-                    // viz.removeShape (obj_name);
-                    // viz.addText (std::to_string(obj_id),
-                    //              centroids[0], centroids[1], 5, 1.0, 1.0, 1.0, obj_name);
-
+                    if (print_time_){
+                        auto viz_tmp_3 = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_tmp_3_time = viz_tmp_3 - viz_pos;
+                        ROS_WARN_STREAM("Total viz_tmp_3 time: " << viz_tmp_3_time.count() << " seconds");
+                    }
                 } // end for
-                tf_base_conversion(obj_pos_vector);
+
+                if (print_time_){
+                    auto viz_tmp_41 = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> viz_tmp_41_time = viz_tmp_41 - viz_pos;
+                    ROS_WARN_STREAM("Total viz_tmp_41 time: " << viz_tmp_41_time.count() << " seconds");
+                }
+
+                std::string parent_frame = "/base";
                 obj_pos_msg_.object_position.clear();
                 for(size_t i = 0; i < obj_pos_vector.size(); i++){
                     geometry_msgs::PointStamped point;
                     point.header.stamp = ros::Time::now();
-                    point.header.frame_id = "/base";
+                    point.header.frame_id = "kinect2_link";
                     int tmp_id = obj_pos_vector[i].first;
                     std::vector<double> tmp_pos = obj_pos_vector[i].second;
                     point.point.x = tmp_pos[0];
@@ -458,68 +491,44 @@ public:
                     point.point.z = tmp_pos[2];
                     point.header.seq = tmp_id;
                     obj_pos_msg_.object_position.push_back(point);
-                    // Compute position and orientation
-                    ROS_ERROR_STREAM("Object " << tmp_id << " : " <<
-                                                    tmp_pos[0] << " " <<
-                                                    tmp_pos[1] << " " <<
-                                                    tmp_pos[2]);
+//                    ROS_ERROR_STREAM("Base frame object " <<
+//                                                    tmp_id << " : " <<
+//                                                    tmp_pos[0] << " " <<
+//                                                    tmp_pos[1] << " " <<
+//                                                    tmp_pos[2]);
+
+                    if (print_time_){
+                        auto viz_tmp_42 = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_tmp_42_time = viz_tmp_42 - viz_pos;
+                        ROS_WARN_STREAM("Total viz_tmp_42 time: " << viz_tmp_42_time.count() << " seconds");
+                    }
 
                 }
+                if (print_time_){
+                    auto viz_tmp_4 = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> viz_tmp_4_time = viz_tmp_4 - viz_pos;
+                    ROS_WARN_STREAM("Total viz_tmp_4 time: " << viz_tmp_4_time.count() << " seconds");
+                }
+
                 _objects_positions_pub.publish(obj_pos_msg_);
+
+                if (print_time_){
+                    auto viz_pos_end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> viz_pos_time = viz_pos_end - viz_pos;
+                    ROS_WARN_STREAM("Total viz_pos time: " << viz_pos_time.count() << " seconds");
+                }
+
+
             } // end if ret
         }
         new_cloud_ = false;
 
-    }
-
-    void tf_base_conversion(std::vector< std::pair< int, std::vector<double> > >& position_in){
-        if(position_in.empty()){
-            ROS_ERROR("THE TRANSFORMATION IS IMPOSSIBLE, EMPTY VECTOR");
-            return;
-        }
-        // position_out.resize(position_in.size());
-        //ROS_INFO("Converting point into robot frame ...");
-        tf::TransformListener listener;
-        tf::StampedTransform stamped_transform;
-        std::string child_frame = "/kinect2_link";
-        std::string parent_frame = "/base";
-        try{
-            listener.lookupTransform(child_frame, parent_frame,
-                                     ros::Time::now(), stamped_transform);
-        }
-        catch (tf::TransformException &ex) {
-            ROS_ERROR("%s",ex.what());
-            ros::Duration(1.0).sleep();
+        if (print_time_){
+            auto viz_finish = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> viz_elapsed = viz_finish - viz_init;
+            ROS_WARN_STREAM("Total viz_cb time: " << viz_elapsed.count() << " seconds");
         }
 
-        std::vector<geometry_msgs::PointStamped> in_point;
-        std::vector<geometry_msgs::PointStamped> out_point;
-        in_point.resize(position_in.size());
-        out_point.resize(position_in.size());
-        for(size_t i = 0; i < in_point.size(); i++){
-            in_point[i].header.frame_id = child_frame;
-
-            //we'll just use the most recent transform available for our simple example
-            in_point[i].header.stamp = ros::Time();
-
-            // int tmp_id = position_in[i].first;
-            std::vector<double> tmp_pos = position_in[i].second;
-            in_point[i].point.x = tmp_pos[0];
-            in_point[i].point.y = tmp_pos[1];
-            in_point[i].point.z = tmp_pos[2];
-
-            try{
-                listener.transformPoint(parent_frame, in_point[i], out_point[i]);
-                ROS_INFO("kinect2_link: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
-                   in_point[i].point.x, in_point[i].point.y, in_point[i].point.z,
-                   out_point[i].point.x, out_point[i].point.y, out_point[i].point.z, out_point[i].header.stamp.toSec());
-            }
-            catch(tf::TransformException& ex){
-                ROS_ERROR("Received an exception trying to transform a point from \"camera_depth_optical_frame\" to \"world\": %s", ex.what());
-            }
-
-            position_in[i].second = {out_point[i].point.x, out_point[i].point.y, out_point[i].point.z};
-        }
     }
 
     void filterPassThrough (const CloudConstPtr &cloud, Cloud &result)
@@ -586,6 +595,10 @@ public:
     void
     cloud_cb (const boost::shared_ptr<const sensor_msgs::PointCloud2>& cloud)
     {
+        std::chrono::time_point<std::chrono::high_resolution_clock> cb_init;
+        if (print_time_)
+            cb_init = std::chrono::high_resolution_clock::now();
+
         boost::mutex::scoped_lock lock (mtx_);
 
         // ROS_ERROR("Inside cloud_cb");
@@ -694,8 +707,21 @@ public:
             ROS_ERROR_STREAM("others_time: " << others_time);
         }
 
+        if (print_time_){
+            auto cb_end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> cb_elapsed = cb_end - cb_init;
+            ROS_WARN_STREAM("Total cb time: " << cb_elapsed.count() << " seconds");
+        }
+
         // Call viewer callback
         viz_cb(viewer_);
+
+        if (print_time_){
+            auto viz_end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> viz_elapsed = viz_end - cb_init;
+            ROS_WARN_STREAM("Total cb + viewer time: " << viz_elapsed.count() << " seconds");
+        }
+
     }
 
 
@@ -715,7 +741,8 @@ public:
         //   exit(-1);
         // }
 
-        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1);
+//        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1);
+        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/cam_frame_obj_pos_vector", 1);
         std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
         ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model_vector");
         pcl_tracking::ObjectCloud srv;
@@ -743,8 +770,8 @@ public:
         initialize_trackers(); // one tracker per object
 
         // Create a ROS subscriber for the input point cloud
-//        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
-        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+//        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
         ros::spin ();
 
         while (ros::ok())
@@ -818,4 +845,5 @@ main (int argc, char** argv)
                                                 visualize_non_downsample, visualize_particles,
                                                 use_fixed, print_time, n);
     v.run (argc, argv);
+
 }

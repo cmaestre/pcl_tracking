@@ -43,10 +43,10 @@ public:
         try {
             bool real_robot;
             std::string cloud_topic_name;
-            _nh.getParam("real_robot", real_robot);
-            if (!real_robot) // SIM
-                cloud_topic_name = "/camera/depth_registered/sw_registered/points";
-            else // REAL
+//            _nh.getParam("real_robot", real_robot);
+//            if (!real_robot) // SIM
+//                cloud_topic_name = "/camera/depth_registered/sw_registered/points";
+//            else // REAL
                 cloud_topic_name = "/kinect2/hd/points";
             _sub = _nh.subscribe (cloud_topic_name, 1, &object_model_creater::cloud_cb, this); // input
             _service = _nh.advertiseService("/visual/get_object_model_vector", &object_model_creater::get_object_model, this); // output
@@ -79,6 +79,9 @@ public:
     void process_cloud(){
         _service_response.clear();
 
+        // Write the original version to disk
+        pcl::PCDWriter writer;
+
         // Create folder to store the generated model clouds
         const boost::posix_time::ptime time = boost::posix_time::second_clock::universal_time();
 
@@ -97,10 +100,10 @@ public:
         std::string out_frame;
         bool real_robot;
         _nh.getParam("real_robot", real_robot);
-        if (real_robot) // REAL
+//        if (real_robot) // REAL
             out_frame = "kinect2_link";
-        else  // SIM
-            out_frame = "camera_depth_optical_frame";
+//        else  // SIM
+//            out_frame = "camera_depth_optical_frame";
         tf2_ros::Buffer tfBuffer;
         tf2_ros::TransformListener listener(tfBuffer);
         geometry_msgs::TransformStamped transformStamped;
@@ -117,7 +120,7 @@ public:
         }
         catch(tf2::TransformException& ex){
             ROS_ERROR("Received an exception trying to transform a point from \"%s\" to \"%s\": %s", in_frame.c_str(), out_frame.c_str(), ex.what());
-        }
+        }        
 
         // From PointCloud2 to PCL point cloud
         pcl::PCLPointCloud2 pcl_pc2;
@@ -158,9 +161,7 @@ public:
 
         std::cerr << "PointCloud after planar filtering: " << cloud_filteredX->width * cloud_filteredX->height << " data points." << std::endl;
 
-//        // Write the original version to disk
-//        pcl::PCDWriter writer;
-//        writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *cloud_filteredX, false);
+        writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/filtered.pcd", *cloud_filteredX, false);
 
         // Euclidean filter
         pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
@@ -202,7 +203,7 @@ public:
 
         std::cerr << "Number of clusters: " << cluster_indices.size() << std::endl;
 
-        pcl::PCDWriter writer;
+//        pcl::PCDWriter writer;
         int j = 0;
         for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
         {
@@ -230,7 +231,6 @@ public:
 
     bool get_object_model(pcl_tracking::ObjectCloud::Request& req,
                           pcl_tracking::ObjectCloud::Response& res){
-ROS_ERROR("get_object_model");
         process_cloud();
         if(_service_response.empty()){
             ROS_WARN("Objects clouds vector is EMPTY, wait or put object in camera FOV");
@@ -268,12 +268,9 @@ int
 main (int argc, char** argv)
 {
     // Initialize ROS
-ROS_ERROR("0");
     ros::init (argc, argv, "create_model");
     ros::NodeHandle nh;
-ROS_ERROR("1");
     object_model_creater models_creator(nh);
-ROS_ERROR("2");
     ros::Rate rate(10);
     // Spin
     while (ros::ok()) {
