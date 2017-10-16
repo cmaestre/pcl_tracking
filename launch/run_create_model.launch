@@ -1,16 +1,21 @@
 <launch> 
+  <arg name="real_camera" default="true"/>
+
   <!--include file="$(find kinect2_bridge)/launch/kinect2_bridge.launch" /-->
 
+  <group if="$(arg real_camera)">
+
   <!--For kinect 2 infront of baxter-->
-  <arg name="camera_link_pose" default="1.62 0.08 0.54 0.6337 0.643 -0.2874 -0.2846"/>
-  
-  <!--For kinect 2 on head of baxter-->
-  <!--arg name="camera_link_pose" default="0.227452 -0.0841643 0.87455 0.69823 -0.678333 0.149447 -0.185532"/-->
+    <arg name="camera_link_pose" default="1.62 0.08 0.54 0.6337 0.643 -0.2874 -0.2846"/>
+    
+    <!--For kinect 2 on head of baxter-->
+    <!--arg name="camera_link_pose" default="0.227452 -0.0841643 0.87455 0.69823 -0.678333 0.149447 -0.185532"/-->
 
-  <!--For kinect 2 on ceiling-->
-  <!--arg name="camera_link_pose" default="0.940112 -0.265958 1.77891 -0.0361337 0.995063 0.0731893 -0.0198442"/-->
+    <!--For kinect 2 on ceiling-->
+    <!--arg name="camera_link_pose" default="0.940112 -0.265958 1.77891 -0.0361337 0.995063 0.0731893 -0.0198442"/-->
 
-  <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/> 
+    <node name="statict_transform" pkg="tf" type="static_transform_publisher" args=" $(arg camera_link_pose) /base /kinect2_link 100"/> 
+  </group>
 
   <rosparam command="load" file="$(find pcl_tracking)/src/params.yaml"/>
 
