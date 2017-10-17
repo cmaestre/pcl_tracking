@@ -8,7 +8,6 @@ roslaunch pcl_tracking run_create_model.launch
 
 roslaunch pcl_tracking run_tracking.launch
 
--------------------------- 
 ## OPTITRACK
 
 roslaunch mocap_optitrack mocap.launch
@@ -32,4 +31,10 @@ roslaunch baxter_gazebo baxter_world_with_table.launch
 roslaunch pcl_tracking run_create_model.launch real_camera:=false
 
 roslaunch pcl_tracking run_tracking.launch
+
+# Built models
+
+The unsupervised generated models (point clouds) are stored, from bigger to smaller, into the folder "models" with the extension PCD, and it can be observed using:
+
+pcl_viewer ~/baxter_ws/src/pcl_tracking/models/current_timestamp/X.pcd
 
