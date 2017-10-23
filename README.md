@@ -1,6 +1,6 @@
 # Dependencies
 
-PCL 1.8
+PCL 1.8 (https://larrylisky.com/2014/03/03/installing-pcl-on-ubuntu/)
 
 Baxter SDK (only for the simulated Kinect)
 
