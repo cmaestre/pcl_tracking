@@ -1,3 +1,9 @@
+# Dependencies
+
+PCL 1.8
+
+Baxter SDK (only for the simulated Kinect)
+
 # Physical camera
 
 ## KINECT2
