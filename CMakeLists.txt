@@ -64,6 +64,15 @@ target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_executable (object_conversions src/object_conversions.cpp)
 target_link_libraries (object_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+add_executable (optitrack_conversions src/optitrack_conversions.cpp)
+target_link_libraries (optitrack_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (optitrack_conversions2 src/optitrack_conversions2.cpp)
+target_link_libraries (optitrack_conversions2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (optitrack_handler src/optitrack_handler.cpp)
+target_link_libraries (optitrack_handler ${catkin_LIBRARIES})
+
 ## Tests
 
 add_executable (planar_segmentation test/planar_segmentation.cpp)

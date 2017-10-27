@@ -132,6 +132,8 @@ public:
 
         std::cerr << "PointCloud before filtering: " << input_tf_pcl_non_zero->width * input_tf_pcl_non_zero->height << " data points." << std::endl;
 
+        writer.write<PointType> ("/home/maestre/baxter_ws/src/pcl_tracking/src/original.pcd", *input_tf_pcl_non_zero, false);
+
         // Planar filter
         double x_min; _nh.getParam("segm_limits/x/min", x_min);
         double x_max; _nh.getParam("segm_limits/x/max", x_max);

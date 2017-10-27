@@ -770,7 +770,7 @@ public:
         initialize_trackers(); // one tracker per object
 
         // Create a ROS subscriber for the input point cloud
-        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+        ros::Subscriber sub = nh.subscribe ("/kinect2/hd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
 //        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
         ros::spin ();
 

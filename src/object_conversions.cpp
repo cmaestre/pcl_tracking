@@ -9,10 +9,23 @@ class tf_publisher{
 public:
     void init(){
         _stamped_transform_publisher = _nh.advertise<geometry_msgs::TransformStamped>("/visual/object_position_base_frame", 1000);
-        _object_update_sub = _nh.subscribe<pcl_tracking::ObjectPosition>("/visual/cam_frame_obj_pos_vector", 10, &tf_publisher::object_callback, this);
+        _object_update_sub = _nh.subscribe<pcl_tracking::ObjectPosition>("/visual/cam_frame_obj_pos_vector", 50, &tf_publisher::object_callback, this);
+        _object_size = 0;
 
         ros::AsyncSpinner my_spinner(4);
         my_spinner.start();
+    }
+
+    void object_callback(const pcl_tracking::ObjectPositionConstPtr& object_msgs){
+        _object_size = object_msgs->object_position.size();
+        for(size_t i = 0; i < _object_size; i++){
+
+
+        //ROS_WARN_STREAM("The choosen point in camera frame is: X = " << point.point.x << ", Y = " << point.point.y << ", and Z = " << point.point.z);
+
+
+        publish_point_frame(object_msgs->object_position[i], "/visual/object_base_frame_" + std::to_string(i));
+        }
     }
 
     void publish_point_frame(geometry_msgs::PointStamped point, std::string child_frame_id){
@@ -33,18 +46,6 @@ public:
         tf_pub.sendTransform(tf::StampedTransform(transform, timestamp, "kinect2_link", child_frame_id));
     }
 
-    void object_callback(const pcl_tracking::ObjectPositionConstPtr& object_msgs){
-        _object_size = object_msgs->object_position.size();
-        for(size_t i = 0; i < _object_size; i++){
-
-
-        //ROS_WARN_STREAM("The choosen point in camera frame is: X = " << point.point.x << ", Y = " << point.point.y << ", and Z = " << point.point.z);
-
-
-        publish_point_frame(object_msgs->object_position[i], "/visual/object_base_frame_" + std::to_string(i));
-        }
-    }
-
     int get_object_size(){
         return _object_size;
     }
@@ -63,6 +64,8 @@ private:
 
 int main(int argc, char **argv)
 {
+    usleep(15e6);
+
     ros::init(argc, argv, "test_octomap_node");
     ros::NodeHandle node;
 
@@ -77,7 +80,8 @@ int main(int argc, char **argv)
     tf_publisher my_tf_publisher;
     my_tf_publisher.init();
 
-    ros::Rate my_rate(20);
+    ros::Rate my_rate(20);   
+
     while (ros::ok()) {
         ros::spinOnce();
 

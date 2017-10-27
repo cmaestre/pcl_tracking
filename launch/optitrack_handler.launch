@@ -1,0 +1,5 @@
+<launch>
+	<param name ="tf_robotbase_file" value="$(find optitrack_publisher)/config/calibration_matrix.yaml"/>
+	<node name="optitrack_handler" pkg="pcl_tracking" type="optitrack_handler" output="screen"/>
+
+</launch>
