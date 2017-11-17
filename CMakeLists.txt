@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 project(pcl_tracking)
 
-find_package(PCL 1.8 REQUIRED)
+find_package(PCL 1.7 REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -fPIC")
 
@@ -55,8 +55,8 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable (create_model src/create_model.cpp)
-target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (create_model src/create_model.cpp)
+#target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable (auto_tracking src/auto_tracking.cpp)
 target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
@@ -75,17 +75,17 @@ target_link_libraries (optitrack_handler ${catkin_LIBRARIES})
 
 ## Tests
 
-add_executable (planar_segmentation test/planar_segmentation.cpp)
-target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (planar_segmentation test/planar_segmentation.cpp)
+#target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (cluster_euclid test/cluster_euclid.cpp)
-target_link_libraries (cluster_euclid ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (cluster_euclid test/cluster_euclid.cpp)
+#target_link_libraries (cluster_euclid ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (example_extract_clusters_normals test/example_extract_clusters_normals.cpp)
-target_link_libraries (example_extract_clusters_normals ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (example_extract_clusters_normals test/example_extract_clusters_normals.cpp)
+#target_link_libraries (example_extract_clusters_normals ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (cluster_extraction test/cluster_extraction.cpp)
-target_link_libraries (cluster_extraction ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (cluster_extraction test/cluster_extraction.cpp)
+#target_link_libraries (cluster_extraction ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 #add_executable (correspondence_grouping test/correspondence_grouping.cpp)
 #target_link_libraries (correspondence_grouping ${catkin_LIBRARIES} ${PCL_LIBRARIES})

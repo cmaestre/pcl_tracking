@@ -18,6 +18,7 @@
   </group>
 
   <rosparam command="load" file="$(find pcl_tracking)/src/params.yaml"/>
+   <rosparam command="load" file="$(find pcl_tracking)/launch/params/parameters.yaml"/>
 
   <node name="pcl_create_model" pkg="pcl_tracking" type="create_model"  output="screen"/> 
 </launch>
