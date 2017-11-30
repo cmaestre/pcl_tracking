@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<robot name="kinect" xmlns:xacro="http://www.ros.org/wiki/xacro">
+	<link name="base"/>
+  	<link name="world"/>
+
+  	<joint name="base_joint" type="fixed">
+	            <origin xyz="0 0 0" rpy="0 0 0" />
+	            <parent link="world"/> 
+	            <child link="base"/>
+	        </joint> 
+
+</robot>

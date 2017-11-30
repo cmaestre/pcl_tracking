@@ -1,0 +1,6 @@
+<launch> 
+  <rosparam command="load" file="$(find pcl_tracking)/src/params.yaml"/>
+   <rosparam command="load" file="$(find pcl_tracking)/launch/params/parameters.yaml"/>
+
+  <node name="planar_segmentation_node" pkg="pcl_tracking" type="planar_segmentation"  output="screen"/> 
+</launch>

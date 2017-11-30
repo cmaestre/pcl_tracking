@@ -99,10 +99,10 @@ int main(int argc, char **argv)
                 point.point.z = msg.transform.translation.z;
                 point.header.seq = i;
                 obj_pos_msg_.object_position.push_back(point);
-                ROS_ERROR_STREAM("Object " << i << " : " <<
-                                                point.point.x << " " <<
-                                                point.point.y << " " <<
-                                                point.point.z);
+//                ROS_ERROR_STREAM("Object " << i << " : " <<
+//                                                point.point.x << " " <<
+//                                                point.point.y << " " <<
+//                                                point.point.z);
             }
             catch (tf::TransformException &ex) {
                 ROS_ERROR("%s",ex.what());

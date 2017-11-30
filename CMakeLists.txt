@@ -55,8 +55,11 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-#add_executable (create_model src/create_model.cpp)
-#target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable (create_model src/create_model.cpp)
+target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (planar_segmentation src/planar_segmentation.cpp)
+target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable (auto_tracking src/auto_tracking.cpp)
 target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})

@@ -1,4 +1,4 @@
 camera_type: "kinect_1"
-full_path: "/home/ghanim/git/pcl_tracking/models/"
-path_original_pcd: "/home/ghanim/git/pcl_tracking/src/"
-path_filtered_pcd: "/home/ghanim/git/pcl_tracking/src/"
+full_path: "/home/mukhtar/git/pcl_tracking/models/"
+path_original_pcd: "/home/mukhtar/git/pcl_tracking/src/"
+path_filtered_pcd: "/home/mukhtar/git/pcl_tracking/src/"
