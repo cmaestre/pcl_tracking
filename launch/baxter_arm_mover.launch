@@ -1,0 +1,7 @@
+<launch> 
+
+  <node name="baxter_arm_mover_node" pkg="pcl_tracking" type="baxter_arm_mover" output="screen">
+  	<remap from="/robot/joint_states" to="/joint_states"/>
+  </node>
+
+</launch>

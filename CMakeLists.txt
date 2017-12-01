@@ -9,6 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -fPIC")
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  moveit_ros_planning_interface
   roscpp
   rospy
   std_msgs
@@ -57,6 +58,9 @@ add_definitions(${PCL_DEFINITIONS})
 
 add_executable (create_model src/create_model.cpp)
 target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (baxter_arm_mover src/baxter_arm_mover.cpp)
+target_link_libraries (baxter_arm_mover ${catkin_LIBRARIES} )
 
 add_executable (planar_segmentation src/planar_segmentation.cpp)
 target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
