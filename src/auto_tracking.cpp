@@ -63,8 +63,8 @@
 #include <pcl/conversions.h>
 #include <pcl_ros/transforms.h> 
 
-#define PCL_NO_PRECOMPILE
-#define PCL_TRACKING_NORMAL_SUPPORTED
+//#define PCL_NO_PRECOMPILE
+//#define PCL_TRACKING_NORMAL_SUPPORTED
 #include <pcl/tracking/tracking.h>
 #include <pcl/tracking/particle_filter.h>
 #include <pcl/tracking/kld_adaptive_particle_filter_omp.h>
@@ -143,8 +143,8 @@ template <typename PointType>
 class OpenNISegmentTracking
 {
 public:
-    typedef pcl::PointXYZRGBNormal RefPointType;
-    //typedef pcl::PointXYZRGBA RefPointType;
+    //typedef pcl::PointXYZRGBNormal RefPointType;
+    typedef pcl::PointXYZRGBA RefPointType;
     //typedef pcl::PointXYZ RefPointType;
     typedef ParticleXYZRPY ParticleT;
 
@@ -242,7 +242,7 @@ public:
 
             tracker_->setParticleNum (400);
             tracker_->setResampleLikelihoodThr(0.00);
-            tracker_->setUseNormal (true);
+            tracker_->setUseNormal (false);
             // setup coherences
             ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr coherence = ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr
                     (new ApproxNearestPairPointCloudCoherence<RefPointType> ());
@@ -368,11 +368,11 @@ public:
             CloudPtr cloud_pass;
             cloud_pass = cloud_pass_;
 
-//            if (!viz.updatePointCloud (cloud_pass, "cloudpass"))
-//            {
-//                viz.addPointCloud (cloud_pass, "cloudpass");
-//                viz.resetCameraViewpoint ("cloudpass");
-//            }
+            if (!viz.updatePointCloud (cloud_pass, "cloudpass"))
+            {
+                viz.addPointCloud (cloud_pass, "cloudpass");
+                viz.resetCameraViewpoint ("cloudpass");
+            }
         }
 
         if (print_time_){
@@ -839,7 +839,7 @@ main (int argc, char** argv)
     bool use_convex_hull = true;
     bool visualize_non_downsample = true;
     bool visualize_particles = false;
-    bool use_fixed = true;
+    bool use_fixed = false;
     bool print_time = false;
 
     double downsampling_grid_size = 0.01;
@@ -863,7 +863,7 @@ main (int argc, char** argv)
     //        }
 
     // open kinect
-    OpenNISegmentTracking<pcl::PointXYZRGBNormal> v (device_id, 8, downsampling_grid_size,
+    OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 8, downsampling_grid_size,
                                                 use_convex_hull,
                                                 visualize_non_downsample, visualize_particles,
                                                 use_fixed, print_time, n);
