@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_msgs
   tf2_sensor_msgs
   pcl_ros
+  mocap_optitrack
 )
 
 add_message_files(
@@ -37,6 +38,7 @@ generate_messages(
   std_msgs
   sensor_msgs
   geometry_msgs
+  mocap_optitrack
 )
 
 catkin_package(
@@ -52,23 +54,25 @@ include_directories(
   ${PCL_INCLUDE_DIRS}
 )
 
+
+
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable (create_model src/create_model.cpp)
-target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (create_model src/create_model.cpp)
+#target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (auto_tracking src/auto_tracking.cpp)
-target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (auto_tracking src/auto_tracking.cpp)
+#target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (object_conversions src/object_conversions.cpp)
-target_link_libraries (object_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (object_conversions src/object_conversions.cpp)
+#target_link_libraries (object_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (optitrack_conversions src/optitrack_conversions.cpp)
-target_link_libraries (optitrack_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (optitrack_conversions src/optitrack_conversions.cpp)
+#target_link_libraries (optitrack_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable (optitrack_conversions2 src/optitrack_conversions2.cpp)
-target_link_libraries (optitrack_conversions2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_executable (optitrack_conversions2 src/optitrack_conversions2.cpp)
+#target_link_libraries (optitrack_conversions2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable (optitrack_handler src/optitrack_handler.cpp)
 target_link_libraries (optitrack_handler ${catkin_LIBRARIES})
