@@ -10,12 +10,17 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_datatypes.h>
 #include <pcl_tracking/ObjectPosition.h>
+#include "mocap_optitrack/ObjectPositionID.h"
+#include "mocap_optitrack/ObjectPoseID.h"
 
 Eigen::Vector3d gTransToRobotBase;
 Eigen::MatrixXd gRotToRobotBase(3,3);
-Eigen::Vector3d position_optitrack_frame, position_robot_frame;
 bool transformed = false;
-geometry_msgs::PointStamped msg;
+mocap_optitrack::ObjectPositionID msg;
+std::vector< std::pair<int, Eigen::Vector3d> > objects_positions_vector;
+//Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+//geometry_msgs::PointStamped msg;
+//std::map<int, Eigen::Vector3d> objects_positions;
 
 void transform_to_robotbase(const Eigen::Vector3d &pos_optitrack, Eigen::Vector3d &pos_robotbase)
 {
@@ -23,29 +28,100 @@ void transform_to_robotbase(const Eigen::Vector3d &pos_optitrack, Eigen::Vector3
     //pos_robotbase = gRotToRobotBase.transpose()*(pos_optitrack - gTransToRobotBase);
 }
 
-void object_pose_callback(const geometry_msgs::PoseStamped::ConstPtr& object_position)
+//void object_pose_callback(const geometry_msgs::PoseStamped::ConstPtr& object_position)
+void pan_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
 {
-//    ROS_INFO_STREAM("object position in optitrack frame: X = " << object_position->pose.position.x
-//                    << " Y = " << object_position->pose.position.z
-//                    << " Z = " << -object_position->pose.position.y);
-    //msg = *object_position;
-
-    position_optitrack_frame(0) = object_position->pose.position.x;
-    position_optitrack_frame(1) = object_position->pose.position.z;
-    position_optitrack_frame(2) = -object_position->pose.position.y;
-
-//        position_optitrack_frame(0) = 0.067;
-//        position_optitrack_frame(1) = -0.71;
-//        position_optitrack_frame(2) = 0.83;
-
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
     transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
 
-//    ROS_INFO_STREAM("object position in robot frame: X = " << position_robot_frame(0)
-//                    << " Y = " << position_robot_frame(1)
-//                    << " Z = " << position_robot_frame(2));
+void green_button_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
 
-//    ROS_WARN("**********************************************");
+void hook_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
 
+void blue_cylinder_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
+
+void dish_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
+
+void tea_box_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
+
+void zuchinni_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
+    transformed = true;
+}
+
+void croissant_pose_callback(const mocap_optitrack::ObjectPositionID::ConstPtr& object_position)
+{
+    Eigen::Vector3d position_optitrack_frame, position_robot_frame;
+    position_optitrack_frame(0) = object_position->object_position.point.x;
+    position_optitrack_frame(1) = object_position->object_position.point.z;
+    position_optitrack_frame(2) = -object_position->object_position.point.y;
+    transform_to_robotbase(position_optitrack_frame, position_robot_frame);
+    std::pair<int, Eigen::Vector3d> current_obj (object_position->ID, position_robot_frame);
+    objects_positions_vector.push_back(current_obj);
     transformed = true;
 }
 
@@ -80,9 +156,9 @@ int load_tf(const std::string& tf_file)
     std::cout << "tf pos : " << gTransToRobotBase << std::endl;
     std::cout << "tf rot : " << gRotToRobotBase << std::endl;
     std::cout << "q0 : " << quat(0) << " q1 : " << quat(1) << " q2 : " << quat(2) << " q3 : "  << quat(3) << std::endl;
+
+    return 0;
 }
-
-
 
 int main(int argc, char **argv)
 {
@@ -90,31 +166,52 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     ros::Publisher object_position_publisher = n.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1000);
-    ros::Subscriber object_position_subscriber = n.subscribe<geometry_msgs::PoseStamped >("/optitrack/blue_cylinder/pose", 1, object_pose_callback);
+    //ros::Subscriber object_position_subscriber = n.subscribe<geometry_msgs::PoseStamped >("/optitrack/blue_cylinder/pose", 1, object_pose_callback);
+
+    ros::Subscriber object_position_subscriber_pan =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/pan/position", 1, pan_pose_callback);
+    ros::Subscriber object_position_subscriber_green_button =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/green_button/position", 1, green_button_pose_callback);
+    ros::Subscriber object_position_subscriber_hook =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/hook/position", 1, hook_pose_callback);
+    ros::Subscriber object_position_subscriber_blue_cylinder =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/blue_cylinder/position", 1, blue_cylinder_pose_callback);
+    ros::Subscriber object_position_subscriber_dish =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/dish/position", 1, dish_pose_callback);
+    ros::Subscriber object_position_subscriber_tea_box =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/tea_box/position", 1, tea_box_pose_callback);
+    ros::Subscriber object_position_subscriber_zuchinni =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/zuchinni/position", 1, zuchinni_pose_callback);
+    ros::Subscriber object_position_subscriber_croissant_pose_callback =
+            n.subscribe<mocap_optitrack::ObjectPositionID >("/optitrack/croissant/position", 1, croissant_pose_callback);
+
     pcl_tracking::ObjectPosition obj_pos_msg_;
     std::string tf_robotbase_file;
     n.getParam("tf_robotbase_file", tf_robotbase_file);
     load_tf(tf_robotbase_file);
-
-
 
     ros::Rate rate(20);
 
     while(ros::ok()){
         try {
             if(transformed){
-                msg.point.x = position_robot_frame(0);
-                msg.point.y = position_robot_frame(1);
-                msg.point.z = position_robot_frame(2);
-                obj_pos_msg_.object_position.push_back(msg);
+                for (const std::pair<int, Eigen::Vector3d>& curr_obj : objects_positions_vector) {
+                    msg.ID = curr_obj.first;
+                    msg.object_position.point.x = curr_obj.second(0);
+                    msg.object_position.point.y = curr_obj.second(1);
+                    msg.object_position.point.z = curr_obj.second(2);
+                    obj_pos_msg_.object_position.push_back(msg);
+                }
             }
         }
         catch (tf::TransformException &ex) {
             ROS_ERROR("%s",ex.what());
         }
-
         object_position_publisher.publish(obj_pos_msg_);
-        obj_pos_msg_.object_position.clear();
+
+        obj_pos_msg_.object_position.clear(); // Clean message
+        objects_positions_vector.clear(); // Clean vector of positions gathered
+        transformed = false;
         ros::spinOnce();
         rate.sleep();
     }

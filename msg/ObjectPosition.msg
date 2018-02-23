@@ -1,1 +1,1 @@
-geometry_msgs/PointStamped[] object_position
+mocap_optitrack/ObjectPositionID[] object_position
