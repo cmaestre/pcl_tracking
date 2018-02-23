@@ -63,8 +63,8 @@
 #include <pcl/conversions.h>
 #include <pcl_ros/transforms.h> 
 
-//#define PCL_NO_PRECOMPILE
-//#define PCL_TRACKING_NORMAL_SUPPORTED
+#define PCL_NO_PRECOMPILE
+#define PCL_TRACKING_NORMAL_SUPPORTED
 #include <pcl/tracking/tracking.h>
 #include <pcl/tracking/particle_filter.h>
 #include <pcl/tracking/kld_adaptive_particle_filter_omp.h>
@@ -141,732 +141,748 @@ using namespace std;
 
 template <typename PointType>
 class OpenNISegmentTracking
-{
-public:
-    //typedef pcl::PointXYZRGBNormal RefPointType;
-    typedef pcl::PointXYZRGBA RefPointType;
-    //typedef pcl::PointXYZ RefPointType;
-    typedef ParticleXYZRPY ParticleT;
-
-    typedef pcl::PointCloud<PointType> Cloud;
-    typedef pcl::PointCloud<RefPointType> RefCloud;
-    typedef typename RefCloud::Ptr RefCloudPtr;
-    typedef typename RefCloud::ConstPtr RefCloudConstPtr;
-    typedef typename Cloud::Ptr CloudPtr;
-    typedef typename Cloud::ConstPtr CloudConstPtr;
-    //typedef KLDAdaptiveParticleFilterTracker<RefPointType, ParticleT> ParticleFilter;
-    //typedef KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> ParticleFilter;
-    //typedef ParticleFilterOMPTracker<RefPointType, ParticleT> ParticleFilter;
-    typedef ParticleFilterTracker<RefPointType, ParticleT> ParticleFilter;
-    typedef typename ParticleFilter::CoherencePtr CoherencePtr;
-    typedef typename pcl::search::KdTree<PointType> KdTree;
-    typedef typename KdTree::Ptr KdTreePtr;
-    OpenNISegmentTracking (const std::string& device_id,
-                           int thread_nr,
-                           double downsampling_grid_size,
-                           bool use_convex_hull,
-                           bool visualize_non_downsample,
-                           bool visualize_particles,
-                           bool use_fixed, bool print_time,
-                           ros::NodeHandle n)
-        : viewer_ ("PCL OpenNI Tracking Viewer")
-        , device_id_ (device_id)
-        , new_cloud_ (false)
-        , ne_ (thread_nr)
-        , counter_ (0)
-        , use_convex_hull_ (use_convex_hull)
-        , visualize_non_downsample_ (visualize_non_downsample)
-        , visualize_particles_ (visualize_particles)
-        , print_time_ (print_time)
-        , use_fixed_ (use_fixed)
-        , thread_nr_ (thread_nr)
-        , downsampling_grid_size_ (downsampling_grid_size)
-        , nh(n)
     {
-        nh.getParam("/", _parameters);
-        _camera_type = static_cast<string>(_parameters["camera_type"]);
-    }
+    public:
+        typedef pcl::PointXYZRGBNormal RefPointType;
+        typedef pcl::PointNormal RefPointType;
+        //typedef pcl::PointXYZRGBA RefPointType;
+        //typedef pcl::PointXYZ RefPointType;
+        typedef ParticleXYZRPY ParticleT;
+        //typedef ParticleFilterOMPTracker qdf;
 
-    void
-    initialize_trackers () {
-        KdTreePtr tree (new KdTree (false));
-        ne_.setSearchMethod (tree);
-        ne_.setRadiusSearch (0.03);
-
-        std::vector<double> default_step_covariance = std::vector<double> (6, 0.015 * 0.015);
-        default_step_covariance[3] *= 40.0;
-        default_step_covariance[4] *= 40.0;
-        default_step_covariance[5] *= 40.0;
-
-        std::vector<double> initial_noise_covariance = std::vector<double> (6, 0.00001);
-        std::vector<double> default_initial_mean = std::vector<double> (6, 0.0);
-
-        // Create a map iterator and point to beginning of map
-        // std::map<int, boost::shared_ptr<ParticleFilter> >::iterator it = tracker_dict_.begin();
-        // for (std::pair< int, boost::shared_ptr<ParticleFilter> > element : tracker_dict_) {
-        for (int obj_id=0; obj_id < nb_objects; obj_id++) {
-            boost::shared_ptr<ParticleFilter> tracker_;
-
-            if (use_fixed_)
+        typedef pcl::PointCloud<PointType> Cloud;
+        typedef pcl::PointCloud<RefPointType> RefCloud;
+        typedef typename RefCloud::Ptr RefCloudPtr;
+        typedef typename RefCloud::ConstPtr RefCloudConstPtr;
+        typedef typename Cloud::Ptr CloudPtr;
+        typedef typename Cloud::ConstPtr CloudConstPtr;
+        //typedef KLDAdaptiveParticleFilterTracker<RefPointType, ParticleT> ParticleFilter;
+        //typedef KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> ParticleFilter;
+        //typedef ParticleFilterOMPTracker<RefPointType, ParticleT> ParticleFilter;
+        typedef ParticleFilterTracker<RefPointType, ParticleT> ParticleFilter;
+        typedef typename ParticleFilter::CoherencePtr CoherencePtr;
+        typedef typename pcl::search::KdTree<PointType> KdTree;
+        typedef typename KdTree::Ptr KdTreePtr;
+        typedef pcl::visualization::PointCloudColorHandlerCustom<PointType> ColorHandlerT;
+        typedef pcl::visualization::PointCloudGeometryHandlerCustom<PointType> GeometryHandlerT;
+        OpenNISegmentTracking (const std::string& device_id,
+                               int thread_nr,
+                               double downsampling_grid_size,
+                               bool use_convex_hull,
+                               bool visualize_non_downsample,
+                               bool visualize_particles,
+                               bool use_fixed, bool print_time,
+                               ros::NodeHandle n)
+            : viewer_ ("PCL OpenNI Tracking Viewer")
+            , device_id_ (device_id)
+            , new_cloud_ (false)
+            , ne_ (thread_nr)
+            , counter_ (0)
+            , use_convex_hull_ (use_convex_hull)
+            , visualize_non_downsample_ (visualize_non_downsample)
+            , visualize_particles_ (visualize_particles)
+            , print_time_ (print_time)
+            , use_fixed_ (use_fixed)
+            , thread_nr_ (thread_nr)
+            , downsampling_grid_size_ (downsampling_grid_size)
+            , nh(n)
             {
-                ROS_WARN("USING FIXED PARTICLES");
-                boost::shared_ptr<ParticleFilterOMPTracker<RefPointType, ParticleT> > tracker
-                        (new ParticleFilterOMPTracker<RefPointType, ParticleT> (thread_nr_));
-                tracker_ = tracker;
-            }
-            else
-            {
-                ROS_WARN("USING ADAPTABLE PARTICLES");
-                boost::shared_ptr<KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> > tracker
-                        (new KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> (thread_nr_));
-                tracker->setMaximumParticleNum (500);
-                tracker->setDelta (0.99);
-                tracker->setEpsilon (0.2);
-                ParticleT bin_size;
-                bin_size.x = 0.1f;
-                bin_size.y = 0.1f;
-                bin_size.z = 0.1f;
-                bin_size.roll = 0.1f;
-                bin_size.pitch = 0.1f;
-                bin_size.yaw = 0.1f;
-                tracker->setBinSize (bin_size);
-                tracker_ = tracker;
-                //tracker->alpha_
+                nh.getParam("/", _parameters);
+                _camera_type = static_cast<string>(_parameters["camera_type"]);
             }
 
-            tracker_->setTrans (Eigen::Affine3f::Identity ());
-            tracker_->setStepNoiseCovariance (default_step_covariance);
-            tracker_->setInitialNoiseCovariance (initial_noise_covariance);
-            tracker_->setInitialNoiseMean (default_initial_mean);
-            tracker_->setIterationNum (1);
+        void
+        initialize_trackers () {
+                KdTreePtr tree (new KdTree (false));
+                ne_.setSearchMethod (tree);
+                ne_.setRadiusSearch (0.03);
 
-            tracker_->setParticleNum (400);
-            tracker_->setResampleLikelihoodThr(0.00);
-            tracker_->setUseNormal (false);
-            // setup coherences
-            ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr coherence = ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr
-                    (new ApproxNearestPairPointCloudCoherence<RefPointType> ());
-            // NearestPairPointCloudCoherence<RefPointType>::Ptr coherence = NearestPairPointCloudCoherence<RefPointType>::Ptr
-            //   (new NearestPairPointCloudCoherence<RefPointType> ());
+                std::vector<double> default_step_covariance = std::vector<double> (6, 0.015 * 0.015);
+                default_step_covariance[3] *= 40.0;
+                default_step_covariance[4] *= 40.0;
+                default_step_covariance[5] *= 40.0;
 
-            boost::shared_ptr<DistanceCoherence<RefPointType> > distance_coherence
-                    = boost::shared_ptr<DistanceCoherence<RefPointType> > (new DistanceCoherence<RefPointType> ());
-            coherence->addPointCoherence (distance_coherence);
+                std::vector<double> initial_noise_covariance = std::vector<double> (6, 0.00001);
+                std::vector<double> default_initial_mean = std::vector<double> (6, 0.0);
 
-            boost::shared_ptr<HSVColorCoherence<RefPointType> > color_coherence
-                    = boost::shared_ptr<HSVColorCoherence<RefPointType> > (new HSVColorCoherence<RefPointType> ());
-            color_coherence->setWeight (0.1);
-            coherence->addPointCoherence (color_coherence);
+                // Create a map iterator and point to beginning of map
+                // std::map<int, boost::shared_ptr<ParticleFilter> >::iterator it = tracker_dict_.begin();
+                // for (std::pair< int, boost::shared_ptr<ParticleFilter> > element : tracker_dict_) {
+                for (int obj_id=0; obj_id < nb_objects; obj_id++) {
+                        boost::shared_ptr<ParticleFilter> tracker_;
 
-            //boost::shared_ptr<pcl::search::KdTree<RefPointType> > search (new pcl::search::KdTree<RefPointType> (false));
-            boost::shared_ptr<pcl::search::Octree<RefPointType> > search (new pcl::search::Octree<RefPointType> (0.01));
-            //boost::shared_ptr<pcl::search::OrganizedNeighbor<RefPointType> > search (new pcl::search::OrganizedNeighbor<RefPointType>);
-            coherence->setSearchMethod (search);
-            coherence->setMaximumDistance (0.01);
-            tracker_->setCloudCoherence (coherence);
+                        if (use_fixed_)
+                            {
+                                ROS_WARN("USING FIXED PARTICLES");
+                                boost::shared_ptr<ParticleFilterOMPTracker<RefPointType, ParticleT> > tracker
+                                        (new ParticleFilterOMPTracker<RefPointType, ParticleT> (thread_nr_));
+                                tracker_ = tracker;
+                            }
+                        else
+                            {
+                                ROS_WARN("USING ADAPTABLE PARTICLES");
+                                boost::shared_ptr<KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> > tracker
+                                        (new KLDAdaptiveParticleFilterOMPTracker<RefPointType, ParticleT> (thread_nr_));
+                                tracker->setMaximumParticleNum (50000);
+                                tracker->setDelta (0.99);
+                                tracker->setEpsilon (0.2);
+                                ParticleT bin_size;
+                                bin_size.x = 0.1f;
+                                bin_size.y = 0.1f;
+                                bin_size.z = 0.1f;
+                                bin_size.roll = 0.1f;
+                                bin_size.pitch = 0.1f;
+                                bin_size.yaw = 0.1f;
+                                tracker->setBinSize (bin_size);
+                                tracker_ = tracker;
+                                //tracker->alpha_
+                            }
 
-            tracker_dict[obj_id] = tracker_;
+                        tracker_->setTrans (Eigen::Affine3f::Identity ());
+                        tracker_->setStepNoiseCovariance (default_step_covariance);
+                        tracker_->setInitialNoiseCovariance (initial_noise_covariance);
+                        tracker_->setInitialNoiseMean (default_initial_mean);
+                        tracker_->setIterationNum (1);
 
-        } // end for
-    }
+                        tracker_->setParticleNum (400);
+                        tracker_->setResampleLikelihoodThr(0.00);
+                        tracker_->setUseNormal (true);
+                        // setup coherences
+                        ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr coherence = ApproxNearestPairPointCloudCoherence<RefPointType>::Ptr
+                                (new ApproxNearestPairPointCloudCoherence<RefPointType> ());
+                        // NearestPairPointCloudCoherence<RefPointType>::Ptr coherence = NearestPairPointCloudCoherence<RefPointType>::Ptr
+                        //   (new NearestPairPointCloudCoherence<RefPointType> ());
 
-    bool
-    drawParticles (pcl::visualization::PCLVisualizer& viz)
-    {
-        int obj_id;
-        boost::shared_ptr<ParticleFilter> tracker_;
-        for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
-            obj_id = tracker_pair.first;
-            tracker_ = tracker_pair.second;
+                        boost::shared_ptr<DistanceCoherence<RefPointType> > distance_coherence
+                                = boost::shared_ptr<DistanceCoherence<RefPointType> > (new DistanceCoherence<RefPointType> ());
+                        coherence->addPointCoherence (distance_coherence);
 
-            ParticleFilter::PointCloudStatePtr particles = tracker_->getParticles ();
-            if (particles)
-            {
-                pcl::PointCloud<pcl::PointXYZ>::Ptr particle_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
-                for (size_t i = 0; i < particles->points.size (); i++)
-                {
-                    pcl::PointXYZ point;
+                        //                        boost::shared_ptr<HSVColorCoherence<RefPointType> > color_coherence
+                        //                                = boost::shared_ptr<HSVColorCoherence<RefPointType> > (new HSVColorCoherence<RefPointType> ());
+                        //                        color_coherence->setWeight (0.1);
+                        //                        coherence->addPointCoherence (color_coherence);
 
-                    point.x = particles->points[i].x;
-                    point.y = particles->points[i].y;
-                    point.z = particles->points[i].z;
-                    particle_cloud->points.push_back (point);
-                }
-                if (visualize_particles_)
-                {
-                    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> blue_color (particle_cloud, 250, 99, 71);
-                    if (!viz.updatePointCloud (particle_cloud, blue_color, "particle cloud"))
-                        viz.addPointCloud (particle_cloud, blue_color, "particle cloud");
-                }
-                // return true;
+                        boost::shared_ptr<NormalCoherence<RefPointType> > normal_coherence
+                                = boost::shared_ptr<NormalCoherence<RefPointType> > (new NormalCoherence<RefPointType> ());
+                        normal_coherence->setWeight(0.1);
+                        coherence->addPointCoherence(normal_coherence);
+
+                        //boost::shared_ptr<pcl::search::KdTree<RefPointType> > search (new pcl::search::KdTree<RefPointType> (false));
+                        boost::shared_ptr<pcl::search::Octree<RefPointType> > search (new pcl::search::Octree<RefPointType> (0.01));
+                        //boost::shared_ptr<pcl::search::OrganizedNeighbor<RefPointType> > search (new pcl::search::OrganizedNeighbor<RefPointType>);
+                        coherence->setSearchMethod (search);
+                        coherence->setMaximumDistance (0.01);
+                        tracker_->setCloudCoherence (coherence);
+
+                        tracker_dict[obj_id] = tracker_;
+
+                    } // end for
             }
-            //                        else
-            //                            {
-            //                                PCL_WARN ("no particles for cloud %i \n", obj_id);
-            //                                // return false;
-            //                            }
-        }
-        return true;
-    }
 
-    void
-    drawResult (pcl::visualization::PCLVisualizer& viz)
-    {
-        int obj_id;
-        boost::shared_ptr<ParticleFilter> tracker_;
-        for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
-            obj_id = tracker_pair.first;
-            tracker_ = tracker_pair.second;
-
-            ParticleXYZRPY result = tracker_->getResult ();
-            Eigen::Affine3f transformation = tracker_->toEigenMatrix (result);
-            // move a little bit for better visualization
-            transformation.translation () += Eigen::Vector3f (0.0f, 0.0f, -0.005f);
-            RefCloudPtr result_cloud (new RefCloud ());
-
-            // pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
-            pcl::transformPointCloud<RefPointType> (*reference_dict[obj_id], *result_cloud, transformation);
-
-            if (visualize_particles_)
+        bool
+        drawParticles (pcl::visualization::PCLVisualizer& viz)
             {
-                pcl::visualization::PointCloudColorHandlerCustom<RefPointType> red_color (result_cloud, 0, 0, 255);
-                if (!viz.updatePointCloud (result_cloud, red_color, "resultcloud"))
-                    viz.addPointCloud (result_cloud, red_color, "resultcloud");
-            }
-            tracked_cloud_dict[obj_id] = result_cloud;
-        }
-    }
-
-    void
-    viz_cb (pcl::visualization::PCLVisualizer& viz)
-    {
-        // ROS_ERROR("Inside viz_cb");
-        //ROS_INFO("1111111111");
-        std::chrono::time_point<std::chrono::high_resolution_clock> viz_init;
-        if (print_time_)
-            viz_init = std::chrono::high_resolution_clock::now();
-
-        std::chrono::time_point<std::chrono::high_resolution_clock> viz_setup;
-        if (print_time_)
-            viz_setup = std::chrono::high_resolution_clock::now();
-
-        viz.setBackgroundColor(0, 0, 0);
-        viz.setCameraClipDistances(0.00884782, 8);
-        viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
-        viz.setCameraFieldOfView(0.7);
-        viz.setSize(960, 716);
-        viz.setPosition(250, 52);
-
-        if (!cloud_pass_)
-        {
-            boost::this_thread::sleep (boost::posix_time::seconds (1));
-            return;
-        }
-
-        if (new_cloud_ && cloud_pass_downsampled_)
-        {
-            CloudPtr cloud_pass;
-            cloud_pass = cloud_pass_;
-
-            if (!viz.updatePointCloud (cloud_pass, "cloudpass"))
-            {
-                viz.addPointCloud (cloud_pass, "cloudpass");
-                viz.resetCameraViewpoint ("cloudpass");
-            }
-        }
-
-        if (print_time_){
-            auto viz_setup_end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> viz_setup_time = viz_setup_end - viz_setup;
-            //ROS_WARN_STREAM("viz_setup time: " << viz_setup_time.count() << " seconds");
-        }
-
-        if (new_cloud_ && (reference_dict.size() > 0) )
-        {
-            std::chrono::time_point<std::chrono::high_resolution_clock> viz_draw;
-            if (print_time_)
-                viz_draw = std::chrono::high_resolution_clock::now();
-
-            bool ret = drawParticles (viz);
-            if (ret)
-            {
-                drawResult (viz);
-
-                viz.removeShape ("M");
-                viz.addText ((boost::format ("number of Measured PointClouds:  %d") % cloud_pass_downsampled_->points.size ()).str (),
-                             10, 40, 20, 1.0, 1.0, 1.0, "M");
-
-                viz.removeShape ("tracking");
-                viz.addText ((boost::format ("tracking:        %f fps") % (1.0 / tracking_time_)).str (),
-                             10, 60, 20, 1.0, 1.0, 1.0, "tracking");
-
-                viz.removeShape ("downsampling");
-                viz.addText ((boost::format ("downsampling:    %f fps") % (1.0 / downsampling_time_)).str (),
-                             10, 80, 20, 1.0, 1.0, 1.0, "downsampling");
-
-                viz.removeShape ("computation");
-                viz.addText ((boost::format ("computation:     %f fps") % (1.0 / computation_time_)).str (),
-                             10, 100, 20, 1.0, 1.0, 1.0, "computation");
-
-                if (print_time_){
-                    auto viz_draw_end = std::chrono::high_resolution_clock::now();
-                    std::chrono::duration<double> viz_draw_time = viz_draw_end - viz_draw;
-                    //ROS_WARN_STREAM("Total viz_draw time: " << viz_draw_time.count() << " seconds");
-                }
-
-                ///// Bounding box
-                std::chrono::time_point<std::chrono::high_resolution_clock> viz_pos;
-                if (print_time_)
-                    viz_pos = std::chrono::high_resolution_clock::now();
-
-                // compute principal direction
                 int obj_id;
-                RefCloudPtr tracked_cloud_;
-                std::vector < std::pair< int, std::vector<double> > > obj_pos_vector;
-                std::vector < std::vector <double > > positions_in_base_frame;
-                std::pair< int, std::vector<double> > centroid_vector;
-                //ROS_INFO("22222222222");
-                for (std::pair< int, RefCloudPtr > tracked_cloud_pair : tracked_cloud_dict) {
-                    obj_id = tracked_cloud_pair.first;
-                    tracked_cloud_ = tracked_cloud_pair.second;
+                boost::shared_ptr<ParticleFilter> tracker_;
+                for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
+                        obj_id = tracker_pair.first;
+                        tracker_ = tracker_pair.second;
 
-                    // print ID (TBD)
+                        ParticleFilter::PointCloudStatePtr particles = tracker_->getParticles ();
+                        if (particles)
+                            {
+                                pcl::PointCloud<pcl::PointXYZ>::Ptr particle_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
+                                for (size_t i = 0; i < particles->points.size (); i++)
+                                    {
+                                        pcl::PointXYZ point;
 
-                    // Remove previous elements
-                    viz.removeShape(std::to_string(obj_id));
-                    viz.removeCoordinateSystem(std::to_string(obj_id));
-
-                    if (print_time_){
-                        auto viz_tmp_1 = std::chrono::high_resolution_clock::now();
-                        std::chrono::duration<double> viz_tmp_1_time = viz_tmp_1 - viz_pos;
-                        //ROS_WARN_STREAM("Total viz_tmp_1 time: " << viz_tmp_1_time.count() << " seconds");
+                                        point.x = particles->points[i].x;
+                                        point.y = particles->points[i].y;
+                                        point.z = particles->points[i].z;
+                                        particle_cloud->points.push_back (point);
+                                    }
+                                if (visualize_particles_)
+                                    {
+                                        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> blue_color (particle_cloud, 250, 99, 71);
+                                        if (!viz.updatePointCloud (particle_cloud, blue_color, "particle cloud"))
+                                            viz.addPointCloud (particle_cloud, blue_color, "particle cloud");
+                                    }
+                                // return true;
+                            }
+                        //                        else
+                        //                            {
+                        //                                PCL_WARN ("no particles for cloud %i \n", obj_id);
+                        //                                // return false;
+                        //                            }
                     }
-
-                    Eigen::Vector4f centroid;
-                    pcl::compute3DCentroid(*tracked_cloud_, centroid);
-                    Eigen::Matrix3f covariance;
-                    computeCovarianceMatrixNormalized(*tracked_cloud_, centroid, covariance);
-                    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-                    Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
-                    eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
-
-                    // move the points to the reference frame
-                    Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
-                    p2w.block<3,3>(0,0) = eigDx.transpose();
-                    p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
-                    pcl::PointCloud<RefPointType> cPoints;
-                    pcl::transformPointCloud(*tracked_cloud_, cPoints, p2w);
-
-                    if (print_time_){
-                        auto viz_tmp_2 = std::chrono::high_resolution_clock::now();
-                        std::chrono::duration<double> viz_tmp_2_time = viz_tmp_2 - viz_pos;
-                        //ROS_WARN_STREAM("Total viz_tmp_2 time: " << viz_tmp_2_time.count() << " seconds");
-                    }
-
-                    RefPointType min_pt, max_pt;
-                    pcl::getMinMax3D(cPoints, min_pt, max_pt);
-                    const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
-                    // final transform
-                    const Eigen::Quaternionf qfinal(eigDx);
-                    const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
-                    viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, std::to_string(obj_id));
-                    viz.setRepresentationToWireframeForAllActors();
-
-                    Eigen::Vector3f centroids = centroid.head<3>();
-                    std::pair< int, std::vector<double> > curr_centroid;
-                    std::vector<double> tmp = {centroid[0], centroid[1], centroid[2]};
-                    curr_centroid = std::make_pair(obj_id, tmp);
-                    obj_pos_vector.push_back(curr_centroid);
-
-                    if (print_time_){
-                        auto viz_tmp_3 = std::chrono::high_resolution_clock::now();
-                        std::chrono::duration<double> viz_tmp_3_time = viz_tmp_3 - viz_pos;
-                        //ROS_WARN_STREAM("Total viz_tmp_3 time: " << viz_tmp_3_time.count() << " seconds");
-                    }
-                    //ROS_INFO("33333333");
-                } // end for
-
-                if (print_time_){
-                    auto viz_tmp_41 = std::chrono::high_resolution_clock::now();
-                    std::chrono::duration<double> viz_tmp_41_time = viz_tmp_41 - viz_pos;
-                    //ROS_WARN_STREAM("Total viz_tmp_41 time: " << viz_tmp_41_time.count() << " seconds");
-                }
-
-                std::string parent_frame = "/base";
-                obj_pos_msg_.object_position.clear();
-                for(size_t i = 0; i < obj_pos_vector.size(); i++){
-                    geometry_msgs::PointStamped point;
-                    point.header.stamp = ros::Time::now();
-                    if(strcmp(_camera_type.c_str(), "kinect_2") == 0)
-                        point.header.frame_id = "kinect2_link";
-                    if(strcmp(_camera_type.c_str(), "kinect_1") == 0)
-                        point.header.frame_id = "camera_link";
-                    int tmp_id = obj_pos_vector[i].first;
-                    std::vector<double> tmp_pos = obj_pos_vector[i].second;
-                    point.point.x = tmp_pos[0];
-                    point.point.y = tmp_pos[1];
-                    point.point.z = tmp_pos[2];
-                    point.header.seq = tmp_id;
-                    obj_pos_msg_.object_position.push_back(point);
-                    //                    ROS_ERROR_STREAM("Base frame object " <<
-                    //                                                    tmp_id << " : " <<
-                    //                                                    tmp_pos[0] << " " <<
-                    //                                                    tmp_pos[1] << " " <<
-                    //                                                    tmp_pos[2]);
-
-                    if (print_time_){
-                        auto viz_tmp_42 = std::chrono::high_resolution_clock::now();
-                        std::chrono::duration<double> viz_tmp_42_time = viz_tmp_42 - viz_pos;
-                        //ROS_WARN_STREAM("Total viz_tmp_42 time: " << viz_tmp_42_time.count() << " seconds");
-                    }
-
-                }
-                if (print_time_){
-                    auto viz_tmp_4 = std::chrono::high_resolution_clock::now();
-                    std::chrono::duration<double> viz_tmp_4_time = viz_tmp_4 - viz_pos;
-                    //ROS_WARN_STREAM("Total viz_tmp_4 time: " << viz_tmp_4_time.count() << " seconds");
-                }
-
-                _objects_positions_pub.publish(obj_pos_msg_);
-
-                if (print_time_){
-                    auto viz_pos_end = std::chrono::high_resolution_clock::now();
-                    std::chrono::duration<double> viz_pos_time = viz_pos_end - viz_pos;
-                    //ROS_WARN_STREAM("Total viz_pos time: " << viz_pos_time.count() << " seconds");
-                }
-
-
-            } // end if ret
-        }
-        new_cloud_ = false;
-
-        if (print_time_){
-            auto viz_finish = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> viz_elapsed = viz_finish - viz_init;
-            //ROS_WARN_STREAM("Total viz_cb time: " << viz_elapsed.count() << " seconds");
-        }
-        //ROS_WARN("*******************************************");
-
-    }
-
-    void filterPassThrough (const CloudConstPtr &cloud, Cloud &result)
-    {
-        FPS_CALC_BEGIN;
-        pcl::PassThrough<PointType> pass;
-        pass.setFilterFieldName ("z");
-        // pass.setFilterLimits (-1, 1);
-        pass.setFilterLimits (0,10);
-        pass.setKeepOrganized (false);
-        pass.setInputCloud (cloud);
-        pass.filter (result);
-        FPS_CALC_END("filterPassThrough");
-    }
-
-    void gridSample (const CloudConstPtr &cloud, Cloud &result, double leaf_size = 0.01)
-    {
-        FPS_CALC_BEGIN;
-        double start = pcl::getTime ();
-        pcl::VoxelGrid<PointType> grid;
-        //pcl::ApproximateVoxelGrid<PointType> grid;
-        grid.setLeafSize (float (leaf_size), float (leaf_size), float (leaf_size));
-        grid.setInputCloud (cloud);
-        grid.filter (result);
-        double end = pcl::getTime ();
-        downsampling_time_ = end - start;
-        FPS_CALC_END("gridSample");
-    }
-
-    void gridSampleApprox (const CloudConstPtr &cloud, Cloud &result, double leaf_size = 0.01)
-    {
-        FPS_CALC_BEGIN;
-        double start = pcl::getTime ();
-        //pcl::VoxelGrid<PointType> grid;
-        pcl::ApproximateVoxelGrid<PointType> grid;
-        grid.setLeafSize (static_cast<float> (leaf_size), static_cast<float> (leaf_size), static_cast<float> (leaf_size));
-        grid.setInputCloud (cloud);
-        grid.filter (result);
-        double end = pcl::getTime ();
-        downsampling_time_ = end - start;
-        FPS_CALC_END("gridSample");
-    }
-
-    void removeZeroPoints (const CloudConstPtr &cloud,
-                           Cloud &result)
-    {
-        for (size_t i = 0; i < cloud->points.size (); i++)
-        {
-            PointType point = cloud->points[i];
-            if (!(fabs(point.x) < 0.01 &&
-                  fabs(point.y) < 0.01 &&
-                  fabs(point.z) < 0.01) &&
-                    !pcl_isnan(point.x) &&
-                    !pcl_isnan(point.y) &&
-                    !pcl_isnan(point.z))
-                result.points.push_back(point);
-        }
-
-        result.width = static_cast<pcl::uint32_t> (result.points.size ());
-        result.height = 1;
-        result.is_dense = true;
-    }
-
-    void
-    cloud_cb (const boost::shared_ptr<const sensor_msgs::PointCloud2>& cloud)
-    {
-        std::chrono::time_point<std::chrono::high_resolution_clock> cb_init;
-        if (print_time_)
-            cb_init = std::chrono::high_resolution_clock::now();
-
-        boost::mutex::scoped_lock lock (mtx_);
-
-        // ROS_ERROR("Inside cloud_cb");
-
-        //std::cerr << "cloud : " << cloud->width * cloud->height << " data points." << std::endl;
-
-        FPS_CALC_BEGIN;
-
-        double start = pcl::getTime ();
-        double end;
-        if (print_time_){
-            start = pcl::getTime ();
-        }
-
-        // From PointCloud2 to PCL point cloud
-        pcl::PCLPointCloud2 pcl_pc2;
-        pcl_conversions::toPCL(*cloud, pcl_pc2);
-        pcl::PointCloud<RefPointType>::Ptr cloud_tf_pcl(new pcl::PointCloud<RefPointType>);
-        pcl::fromPCLPointCloud2(pcl_pc2, *cloud_tf_pcl);
-        //std::cerr << "cloud_tf_pcl : " << cloud_tf_pcl->width * cloud_tf_pcl->height << " data points." << std::endl;
-
-        if (print_time_){
-            end = pcl::getTime ();
-            double toPCL_time = end - start;
-            //ROS_ERROR_STREAM("toPCL_time: " << toPCL_time);
-            start = pcl::getTime ();
-        }
-
-        // light filter
-        cloud_pass_.reset (new Cloud);
-        cloud_pass_downsampled_.reset (new Cloud);
-        pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-        pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
-        filterPassThrough (cloud_tf_pcl, *cloud_pass_);
-
-        if (counter_ < nb_wait_iter) // wait initialization
-        {
-            gridSample (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
-        }
-        else if (counter_ == nb_wait_iter) // set object to track
-        {
-            int obj_id;
-            boost::shared_ptr<ParticleFilter> tracker_;
-            CloudPtr ref_cloud;
-            for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
-                obj_id = tracker_pair.first;
-                tracker_ = tracker_pair.second;
-                ref_cloud = ref_cloud_dict[obj_id];
-
-                //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
-
-                RefCloudPtr nonzero_ref (new RefCloud);
-                removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
-                //std::cerr << "nonzero_ref: " << nonzero_ref->width * nonzero_ref->height << " data points." << std::endl;
-
-                //PCL_INFO ("calculating cog\n"); // center of gravity
-
-                Eigen::Vector4f c;
-                RefCloudPtr transed_ref (new RefCloud);
-                pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
-                Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
-                trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
-                //      pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
-                //std::cout << "Matrix before " <<  trans.matrix() << std::endl;
-                pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
-                //std::cout << "Matrix after " <<  trans.matrix() << std::endl;
-
-                CloudPtr transed_ref_downsampled (new Cloud);
-                gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
-                tracker_->setReferenceCloud (transed_ref_downsampled); // TRACK THIS CLOUD !!
-                tracker_->setTrans (trans);
-                reference_dict[obj_id] = transed_ref;
-                tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2); // SET INDICES TO TRACK
+                return true;
             }
 
-        }
-        else //track the object
-        {
-            //std::cerr << "PointCloud before downsampled: " << cloud_pass_->width * cloud_pass_->height << " data points." << std::endl;
-            gridSampleApprox (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
-            //std::cerr << "PointCloud after downsampled: " << cloud_pass_downsampled_->width * cloud_pass_downsampled_->height << " data points." << std::endl;
+        void
+        drawResult (pcl::visualization::PCLVisualizer& viz)
+            {
+                int obj_id;
+                boost::shared_ptr<ParticleFilter> tracker_;
+                for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
+                        obj_id = tracker_pair.first;
+                        tracker_ = tracker_pair.second;
 
-            // int obj_id;
-            boost::shared_ptr<ParticleFilter> tracker_;
-            for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
-                // obj_id = tracker_pair.first;
-                tracker_ = tracker_pair.second;
-                tracker_->setInputCloud (cloud_pass_downsampled_);
-                try{
-                    tracker_->compute ();
-                } catch (int e) {
-                    ROS_ERROR_STREAM("Object not recognized");
-                }
+                        ParticleXYZRPY result = tracker_->getResult ();
+                        Eigen::Affine3f transformation = tracker_->toEigenMatrix (result);
+                        // move a little bit for better visualization
+                        transformation.translation () += Eigen::Vector3f (0.0f, 0.0f, -0.005f);
+                        RefCloudPtr result_cloud (new RefCloud ());
+
+                        // pcl::transformPointCloud<RefPointType> (*(tracker_->getReferenceCloud ()), *result_cloud, transformation);
+                        pcl::transformPointCloud<RefPointType> (*reference_dict[obj_id], *result_cloud, transformation);
+
+                        if (visualize_particles_)
+                            {
+                                pcl::visualization::PointCloudColorHandlerCustom<RefPointType> red_color (result_cloud, 0, 0, 255);
+                                if (!viz.updatePointCloud (result_cloud, red_color, "resultcloud"))
+                                    viz.addPointCloud (result_cloud, red_color, "resultcloud");
+                            }
+                        tracked_cloud_dict[obj_id] = result_cloud;
+                    }
             }
-        }
 
-        new_cloud_ = true;
-        end = pcl::getTime ();
-        computation_time_ = end - start;
-        FPS_CALC_END("computation");
-        counter_++;
+        void
+        viz_cb (pcl::visualization::PCLVisualizer& viz)
+            {
+                // ROS_ERROR("Inside viz_cb");
+                //ROS_INFO("1111111111");
+                std::chrono::time_point<std::chrono::high_resolution_clock> viz_init;
+                if (print_time_)
+                    viz_init = std::chrono::high_resolution_clock::now();
 
-        if (print_time_){
-            end = pcl::getTime ();
-            double others_time = end - start;
-            //ROS_ERROR_STREAM("others_time: " << others_time);
-        }
+                std::chrono::time_point<std::chrono::high_resolution_clock> viz_setup;
+                if (print_time_)
+                    viz_setup = std::chrono::high_resolution_clock::now();
 
-        if (print_time_){
-            auto cb_end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> cb_elapsed = cb_end - cb_init;
-            //ROS_WARN_STREAM("Total cb time: " << cb_elapsed.count() << " seconds");
-        }
+                viz.setBackgroundColor(0, 0, 0);
+                viz.setCameraClipDistances(0.00884782, 8);
+                viz.setCameraPosition( 0.0926632, 0.158074, -0.955283, 0.0926631, 0.158074, -0.955282, 0.0229289, -0.994791, -0.0993251);
+                viz.setCameraFieldOfView(0.7);
+                viz.setSize(960, 716);
+                viz.setPosition(250, 52);
 
-        // Call viewer callback
-        viz_cb(viewer_);
+                if (!cloud_pass_)
+                    {
+                        boost::this_thread::sleep (boost::posix_time::seconds (1));
+                        return;
+                    }
 
-        if (print_time_){
-            auto viz_end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> viz_elapsed = viz_end - cb_init;
-            //ROS_WARN_STREAM("Total cb + viewer time: " << viz_elapsed.count() << " seconds");
-        }
+                if (new_cloud_ && cloud_pass_downsampled_)
+                    {
+                        CloudPtr cloud_pass;
+                        cloud_pass = cloud_pass_;
 
-    }
+                        //if (!viz.updatePointCloud (cloud_pass, "cloudpass"))
+                        //  {
+                        //viz.addPointCloud (cloud_pass, ColorHandlerT (cloud_pass, 0.0, 255.0, 0.0), "cloudpass");
+                        //viz.resetCameraViewpoint ("cloudpass");
+                        //}
+                    }
+
+                if (print_time_){
+                        auto viz_setup_end = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_setup_time = viz_setup_end - viz_setup;
+                        //ROS_WARN_STREAM("viz_setup time: " << viz_setup_time.count() << " seconds");
+                    }
+
+                if (new_cloud_ && (reference_dict.size() > 0) )
+                    {
+                        std::chrono::time_point<std::chrono::high_resolution_clock> viz_draw;
+                        if (print_time_)
+                            viz_draw = std::chrono::high_resolution_clock::now();
+
+                        bool ret = drawParticles (viz);
+                        if (ret)
+                            {
+                                drawResult (viz);
+
+                                viz.removeShape ("M");
+                                viz.addText ((boost::format ("number of Measured PointClouds:  %d") % cloud_pass_downsampled_->points.size ()).str (),
+                                             10, 40, 20, 1.0, 1.0, 1.0, "M");
+
+                                viz.removeShape ("tracking");
+                                viz.addText ((boost::format ("tracking:        %f fps") % (1.0 / tracking_time_)).str (),
+                                             10, 60, 20, 1.0, 1.0, 1.0, "tracking");
+
+                                viz.removeShape ("downsampling");
+                                viz.addText ((boost::format ("downsampling:    %f fps") % (1.0 / downsampling_time_)).str (),
+                                             10, 80, 20, 1.0, 1.0, 1.0, "downsampling");
+
+                                viz.removeShape ("computation");
+                                viz.addText ((boost::format ("computation:     %f fps") % (1.0 / computation_time_)).str (),
+                                             10, 100, 20, 1.0, 1.0, 1.0, "computation");
+
+                                if (print_time_){
+                                        auto viz_draw_end = std::chrono::high_resolution_clock::now();
+                                        std::chrono::duration<double> viz_draw_time = viz_draw_end - viz_draw;
+                                        //ROS_WARN_STREAM("Total viz_draw time: " << viz_draw_time.count() << " seconds");
+                                    }
+
+                                ///// Bounding box
+                                std::chrono::time_point<std::chrono::high_resolution_clock> viz_pos;
+                                if (print_time_)
+                                    viz_pos = std::chrono::high_resolution_clock::now();
+
+                                // compute principal direction
+                                int obj_id;
+                                RefCloudPtr tracked_cloud_;
+                                std::vector < std::pair< int, std::vector<double> > > obj_pos_vector;
+                                std::vector < std::vector <double > > positions_in_base_frame;
+                                std::pair< int, std::vector<double> > centroid_vector;
+                                //ROS_INFO("22222222222");
+                                for (std::pair< int, RefCloudPtr > tracked_cloud_pair : tracked_cloud_dict) {
+                                        obj_id = tracked_cloud_pair.first;
+                                        tracked_cloud_ = tracked_cloud_pair.second;
+
+                                        // print ID (TBD)
+
+                                        // Remove previous elements
+                                        viz.removeShape(std::to_string(obj_id));
+                                        viz.removeCoordinateSystem(std::to_string(obj_id));
+
+                                        if (print_time_){
+                                                auto viz_tmp_1 = std::chrono::high_resolution_clock::now();
+                                                std::chrono::duration<double> viz_tmp_1_time = viz_tmp_1 - viz_pos;
+                                                //ROS_WARN_STREAM("Total viz_tmp_1 time: " << viz_tmp_1_time.count() << " seconds");
+                                            }
+
+                                        Eigen::Vector4f centroid;
+                                        pcl::compute3DCentroid(*tracked_cloud_, centroid);
+                                        Eigen::Matrix3f covariance;
+                                        computeCovarianceMatrixNormalized(*tracked_cloud_, centroid, covariance);
+                                        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
+                                        Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+                                        eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+
+                                        // move the points to the reference frame
+                                        Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+                                        p2w.block<3,3>(0,0) = eigDx.transpose();
+                                        p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
+                                        pcl::PointCloud<RefPointType> cPoints;
+                                        pcl::transformPointCloud(*tracked_cloud_, cPoints, p2w);
+
+                                        if (print_time_){
+                                                auto viz_tmp_2 = std::chrono::high_resolution_clock::now();
+                                                std::chrono::duration<double> viz_tmp_2_time = viz_tmp_2 - viz_pos;
+                                                //ROS_WARN_STREAM("Total viz_tmp_2 time: " << viz_tmp_2_time.count() << " seconds");
+                                            }
+
+                                        RefPointType min_pt, max_pt;
+                                        pcl::getMinMax3D(cPoints, min_pt, max_pt);
+                                        const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
+                                        // final transform
+                                        const Eigen::Quaternionf qfinal(eigDx);
+                                        const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
+                                        viz.addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, std::to_string(obj_id));
+                                        viz.setRepresentationToWireframeForAllActors();
+
+                                        Eigen::Vector3f centroids = centroid.head<3>();
+                                        std::pair< int, std::vector<double> > curr_centroid;
+                                        std::vector<double> tmp = {centroid[0], centroid[1], centroid[2]};
+                                        curr_centroid = std::make_pair(obj_id, tmp);
+                                        obj_pos_vector.push_back(curr_centroid);
+
+                                        if (print_time_){
+                                                auto viz_tmp_3 = std::chrono::high_resolution_clock::now();
+                                                std::chrono::duration<double> viz_tmp_3_time = viz_tmp_3 - viz_pos;
+                                                //ROS_WARN_STREAM("Total viz_tmp_3 time: " << viz_tmp_3_time.count() << " seconds");
+                                            }
+                                        //ROS_INFO("33333333");
+                                    } // end for
+
+                                if (print_time_){
+                                        auto viz_tmp_41 = std::chrono::high_resolution_clock::now();
+                                        std::chrono::duration<double> viz_tmp_41_time = viz_tmp_41 - viz_pos;
+                                        //ROS_WARN_STREAM("Total viz_tmp_41 time: " << viz_tmp_41_time.count() << " seconds");
+                                    }
+
+                                std::string parent_frame = "/base";
+                                obj_pos_msg_.object_position.clear();
+                                for(size_t i = 0; i < obj_pos_vector.size(); i++){
+                                        geometry_msgs::PointStamped point;
+                                        point.header.stamp = ros::Time::now();
+                                        if(strcmp(_camera_type.c_str(), "kinect_2") == 0)
+                                            point.header.frame_id = "kinect2_link";
+                                        if(strcmp(_camera_type.c_str(), "kinect_1") == 0)
+                                            point.header.frame_id = "camera_link";
+                                        int tmp_id = obj_pos_vector[i].first;
+                                        std::vector<double> tmp_pos = obj_pos_vector[i].second;
+                                        point.point.x = tmp_pos[0];
+                                        point.point.y = tmp_pos[1];
+                                        point.point.z = tmp_pos[2];
+                                        point.header.seq = tmp_id;
+                                        obj_pos_msg_.object_position.push_back(point);
+                                        //                    ROS_ERROR_STREAM("Base frame object " <<
+                                        //                                                    tmp_id << " : " <<
+                                        //                                                    tmp_pos[0] << " " <<
+                                        //                                                    tmp_pos[1] << " " <<
+                                        //                                                    tmp_pos[2]);
+
+                                        if (print_time_){
+                                                auto viz_tmp_42 = std::chrono::high_resolution_clock::now();
+                                                std::chrono::duration<double> viz_tmp_42_time = viz_tmp_42 - viz_pos;
+                                                //ROS_WARN_STREAM("Total viz_tmp_42 time: " << viz_tmp_42_time.count() << " seconds");
+                                            }
+
+                                    }
+                                if (print_time_){
+                                        auto viz_tmp_4 = std::chrono::high_resolution_clock::now();
+                                        std::chrono::duration<double> viz_tmp_4_time = viz_tmp_4 - viz_pos;
+                                        //ROS_WARN_STREAM("Total viz_tmp_4 time: " << viz_tmp_4_time.count() << " seconds");
+                                    }
+
+                                _objects_positions_pub.publish(obj_pos_msg_);
+
+                                if (print_time_){
+                                        auto viz_pos_end = std::chrono::high_resolution_clock::now();
+                                        std::chrono::duration<double> viz_pos_time = viz_pos_end - viz_pos;
+                                        //ROS_WARN_STREAM("Total viz_pos time: " << viz_pos_time.count() << " seconds");
+                                    }
 
 
-    void
-    run (int argc, char** argv)
-    {
-        std::cout << "RUN" << std::endl;
+                            } // end if ret
+                    }
+                new_cloud_ = false;
 
-        // Initialize ROS
-        ros::init (argc, argv, "create_model");
+                if (print_time_){
+                        auto viz_finish = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_elapsed = viz_finish - viz_init;
+                        //ROS_WARN_STREAM("Total viz_cb time: " << viz_elapsed.count() << " seconds");
+                    }
+                //ROS_WARN("*******************************************");
 
+            }
 
-        // // Load object to track (in the camera frame)
-        // ref_cloud.reset(new Cloud());
-        // if(pcl::io::loadPCDFile (argv[1], *ref_cloud) == -1){
-        //   std::cout << "pcd file not found" << std::endl;
-        //   exit(-1);
-        // }
+        void filterPassThrough (const CloudConstPtr &cloud, Cloud &result)
+            {
+                FPS_CALC_BEGIN;
+                pcl::PassThrough<PointType> pass;
+                pass.setFilterFieldName ("z");
+                // pass.setFilterLimits (-1, 1);
+                pass.setFilterLimits (0,10);
+                pass.setKeepOrganized (false);
+                pass.setInputCloud (cloud);
+                pass.filter (result);
+                FPS_CALC_END("filterPassThrough");
+            }
 
-        //        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1);
-        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/cam_frame_obj_pos_vector", 1);
-        std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
-        ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model_vector");
-        pcl_tracking::ObjectCloud srv;
-        if (client.call(srv))
-        {
-            obj_cloud_vector = srv.response.cloud_vector;
-            nb_objects = obj_cloud_vector.size();
+        void gridSample (const CloudConstPtr &cloud, Cloud &result, double leaf_size = 0.01)
+            {
+                FPS_CALC_BEGIN;
+                double start = pcl::getTime ();
+                pcl::VoxelGrid<PointType> grid;
+                //pcl::ApproximateVoxelGrid<PointType> grid;
+                grid.setLeafSize (float (leaf_size), float (leaf_size), float (leaf_size));
+                grid.setInputCloud (cloud);
+                grid.filter (result);
+                double end = pcl::getTime ();
+                downsampling_time_ = end - start;
+                FPS_CALC_END("gridSample");
+            }
 
-            for (int obj_id=0; obj_id < nb_objects; obj_id++){
+        void gridSampleApprox (const CloudConstPtr &cloud, Cloud &result, double leaf_size = 0.01)
+            {
+                FPS_CALC_BEGIN;
+                double start = pcl::getTime ();
+                //pcl::VoxelGrid<PointType> grid;
+                pcl::ApproximateVoxelGrid<PointType> grid;
+                grid.setLeafSize (static_cast<float> (leaf_size), static_cast<float> (leaf_size), static_cast<float> (leaf_size));
+                grid.setInputCloud (cloud);
+                grid.filter (result);
+                double end = pcl::getTime ();
+                downsampling_time_ = end - start;
+                FPS_CALC_END("gridSample");
+            }
+
+        void removeZeroPoints (const CloudConstPtr &cloud,
+                               Cloud &result)
+            {
+                for (size_t i = 0; i < cloud->points.size (); i++)
+                    {
+                        PointType point = cloud->points[i];
+                        if (!(fabs(point.x) < 0.01 &&
+                              fabs(point.y) < 0.01 &&
+                              fabs(point.z) < 0.01) &&
+                                !pcl_isnan(point.x) &&
+                                !pcl_isnan(point.y) &&
+                                !pcl_isnan(point.z))
+                            result.points.push_back(point);
+                    }
+
+                result.width = static_cast<pcl::uint32_t> (result.points.size ());
+                result.height = 1;
+                result.is_dense = true;
+            }
+
+        void
+        cloud_cb (const boost::shared_ptr<const sensor_msgs::PointCloud2>& cloud)
+            {
+                std::chrono::time_point<std::chrono::high_resolution_clock> cb_init;
+                if (print_time_)
+                    cb_init = std::chrono::high_resolution_clock::now();
+
+                boost::mutex::scoped_lock lock (mtx_);
+
+                // ROS_ERROR("Inside cloud_cb");
+
+                //std::cerr << "cloud : " << cloud->width * cloud->height << " data points." << std::endl;
+
+                FPS_CALC_BEGIN;
+
+                double start = pcl::getTime ();
+                double end;
+                if (print_time_){
+                        start = pcl::getTime ();
+                    }
+
                 // From PointCloud2 to PCL point cloud
                 pcl::PCLPointCloud2 pcl_pc2;
-                pcl_conversions::toPCL(obj_cloud_vector[obj_id], pcl_pc2);
-                pcl::PointCloud<RefPointType>::Ptr input_cloud_pcl(new pcl::PointCloud<PointType>);
-                pcl::fromPCLPointCloud2(pcl_pc2, *input_cloud_pcl);
+                pcl_conversions::toPCL(*cloud, pcl_pc2);
+                pcl::PointCloud<RefPointType>::Ptr cloud_tf_pcl(new pcl::PointCloud<RefPointType>);
+                pcl::fromPCLPointCloud2(pcl_pc2, *cloud_tf_pcl);
 
-                ref_cloud_dict[obj_id] = input_cloud_pcl;
+                //ne_.setInputCloud(cloud_tf_pcl);
+                //ne_.compute(*cloud_tf_pcl);
+                //std::cerr << "cloud_tf_pcl : " << cloud_tf_pcl->width * cloud_tf_pcl->height << " data points." << std::endl;
+
+                if (print_time_){
+                        end = pcl::getTime ();
+                        double toPCL_time = end - start;
+                        //ROS_ERROR_STREAM("toPCL_time: " << toPCL_time);
+                        start = pcl::getTime ();
+                    }
+
+                // light filter
+                cloud_pass_.reset (new Cloud);
+                cloud_pass_downsampled_.reset (new Cloud);
+                pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+                pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+                filterPassThrough (cloud_tf_pcl, *cloud_pass_);
+
+                if (counter_ < nb_wait_iter) // wait initialization
+                    {
+                        gridSample (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
+                    }
+                else if (counter_ == nb_wait_iter) // set object to track
+                    {
+                        int obj_id;
+                        boost::shared_ptr<ParticleFilter> tracker_;
+                        CloudPtr ref_cloud;
+                        for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
+                                obj_id = tracker_pair.first;
+                                tracker_ = tracker_pair.second;
+                                ref_cloud = ref_cloud_dict[obj_id];
+
+                                //std::cerr << "ref_cloud: " << ref_cloud->width * ref_cloud->height << " data points." << std::endl;
+
+                                RefCloudPtr nonzero_ref (new RefCloud);
+                                removeZeroPoints (ref_cloud, *nonzero_ref); // OBJECT TO TRACK !!!!
+                                //std::cerr << "nonzero_ref: " << nonzero_ref->width * nonzero_ref->height << " data points." << std::endl;
+
+                                //PCL_INFO ("calculating cog\n"); // center of gravity
+
+                                Eigen::Vector4f c;
+                                RefCloudPtr transed_ref (new RefCloud);
+                                pcl::compute3DCentroid<RefPointType> (*nonzero_ref, c); // obj init pos : centroid
+                                Eigen::Affine3f trans = Eigen::Affine3f::Identity ();
+                                trans.translation ().matrix () = Eigen::Vector3f (c[0], c[1], c[2]);
+                                //      pcl::transformPointCloudWithNormals<RefPointType> (*ref_cloud, *transed_ref, trans.inverse());
+                                //std::cout << "Matrix before " <<  trans.matrix() << std::endl;
+                                pcl::transformPointCloud<RefPointType> (*nonzero_ref, *transed_ref, trans.inverse()); // store it into trans
+                                //std::cout << "Matrix after " <<  trans.matrix() << std::endl;
+
+                                CloudPtr transed_ref_downsampled (new Cloud);
+                                gridSample (transed_ref, *transed_ref_downsampled, downsampling_grid_size_);
+                                tracker_->setReferenceCloud (transed_ref_downsampled); // TRACK THIS CLOUD !!
+                                tracker_->setTrans (trans);
+                                reference_dict[obj_id] = transed_ref;
+                                tracker_->setMinIndices (int (ref_cloud->points.size ()) / 2); // SET INDICES TO TRACK
+                            }
+
+                    }
+                else //track the object
+                    {
+                        //std::cerr << "PointCloud before downsampled: " << cloud_pass_->width * cloud_pass_->height << " data points." << std::endl;
+                        gridSampleApprox (cloud_pass_, *cloud_pass_downsampled_, downsampling_grid_size_);
+                        //std::cerr << "PointCloud after downsampled: " << cloud_pass_downsampled_->width * cloud_pass_downsampled_->height << " data points." << std::endl;
+
+                        // int obj_id;
+                        boost::shared_ptr<ParticleFilter> tracker_;
+                        for (std::pair< int, boost::shared_ptr<ParticleFilter> > tracker_pair : tracker_dict) {
+                                // obj_id = tracker_pair.first;
+                                tracker_ = tracker_pair.second;
+                                tracker_->setInputCloud (cloud_pass_downsampled_);
+                                try{
+                                    tracker_->compute ();
+                                } catch (int e) {
+                                        ROS_ERROR_STREAM("Object not recognized");
+                                    }
+                            }
+                    }
+
+                new_cloud_ = true;
+                end = pcl::getTime ();
+                computation_time_ = end - start;
+                FPS_CALC_END("computation");
+                counter_++;
+
+                if (print_time_){
+                        end = pcl::getTime ();
+                        double others_time = end - start;
+                        //ROS_ERROR_STREAM("others_time: " << others_time);
+                    }
+
+                if (print_time_){
+                        auto cb_end = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> cb_elapsed = cb_end - cb_init;
+                        //ROS_WARN_STREAM("Total cb time: " << cb_elapsed.count() << " seconds");
+                    }
+
+                // Call viewer callback
+                viz_cb(viewer_);
+
+                if (print_time_){
+                        auto viz_end = std::chrono::high_resolution_clock::now();
+                        std::chrono::duration<double> viz_elapsed = viz_end - cb_init;
+                        //ROS_WARN_STREAM("Total cb + viewer time: " << viz_elapsed.count() << " seconds");
+                    }
+
             }
-        }
-        else
-        {
-            //ROS_ERROR("Failed to call service get_object_model");
-            return ;
-        }
 
-        initialize_trackers(); // one tracker per object
 
-        // Create a ROS subscriber for the input point cloud
-        ros::Subscriber sub;
-        if(strcmp(_camera_type.c_str(), "kinect_2") == 0)
-            sub = nh.subscribe ("/kinect2/hd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
-        if(strcmp(_camera_type.c_str(), "kinect_1") == 0)
-            sub = nh.subscribe ("/camera/depth_registered/sw_registered/points", 1, &OpenNISegmentTracking::cloud_cb, this);
-        //        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
-        ros::spin ();
+        void
+        run (int argc, char** argv)
+            {
+                std::cout << "RUN" << std::endl;
 
-        while (ros::ok())
-            viewer_.spinOnce (100, true);
-        boost::this_thread::sleep( boost::posix_time::milliseconds(100));
-    }
+                // Initialize ROS
+                ros::init (argc, argv, "create_model");
 
-    int nb_objects;
 
-    ros::Publisher _objects_positions_pub;
-    pcl_tracking::ObjectPosition obj_pos_msg_;
-    pcl::visualization::PCLVisualizer viewer_ ;
-    CloudPtr cloud_pass_;
-    CloudPtr cloud_pass_downsampled_;
-    // std::vector<CloudPtr> ref_cloud_vector; // object clouds to track
-    std::map<int, CloudPtr> ref_cloud_dict; // object clouds to track
-    std::map<int, CloudPtr> reference_dict;
-    std::map<int, RefCloudPtr> tracked_cloud_dict;
-    std::map<int, boost::shared_ptr<ParticleFilter> > tracker_dict;
+                // // Load object to track (in the camera frame)
+                // ref_cloud.reset(new Cloud());
+                // if(pcl::io::loadPCDFile (argv[1], *ref_cloud) == -1){
+                //   std::cout << "pcd file not found" << std::endl;
+                //   exit(-1);
+                // }
 
-    std::string device_id_, _camera_type;
-    boost::mutex mtx_;
-    bool new_cloud_;
-    pcl::NormalEstimationOMP<PointType, pcl::Normal> ne_; // to store threadpool
-    unsigned counter_;
-    bool use_convex_hull_;
-    bool visualize_non_downsample_;
-    bool visualize_particles_;
-    bool print_time_;
-    bool use_fixed_;
-    int thread_nr_;
-    double tracking_time_;
-    double computation_time_;
-    double downsampling_time_;
-    double downsampling_grid_size_;
-    ros::NodeHandle nh;
-    XmlRpc::XmlRpcValue _parameters;
-};
+                //        _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/obj_pos_vector", 1);
+                _objects_positions_pub = nh.advertise<pcl_tracking::ObjectPosition>("/visual/cam_frame_obj_pos_vector", 1);
+                std::vector< sensor_msgs::PointCloud2 > obj_cloud_vector;
+                ros::ServiceClient client = nh.serviceClient <pcl_tracking::ObjectCloud> ("/visual/get_object_model_vector");
+                pcl_tracking::ObjectCloud srv;
+                if (client.call(srv))
+                    {
+                        obj_cloud_vector = srv.response.cloud_vector;
+                        nb_objects = obj_cloud_vector.size();
+
+                        int counter_2 = 0;
+                        for (int obj_id=0; obj_id < nb_objects; obj_id++){
+                                // From PointCloud2 to PCL point cloud
+                                pcl::PCLPointCloud2 pcl_pc2;
+                                pcl_conversions::toPCL(obj_cloud_vector[obj_id], pcl_pc2);
+                                pcl::PointCloud<RefPointType>::Ptr input_cloud_pcl(new pcl::PointCloud<PointType>);
+
+                                pcl::fromPCLPointCloud2(pcl_pc2, *input_cloud_pcl);
+                                ROS_ERROR_STREAM("TEST : " << counter_2 << counter_2 << counter_2 << counter_2 << counter_2);
+
+                                ref_cloud_dict[obj_id] = input_cloud_pcl;
+                                counter_2++;
+                            }
+                    }
+                else
+                    {
+                        //ROS_ERROR("Failed to call service get_object_model");
+                        return ;
+                    }
+
+                initialize_trackers(); // one tracker per object
+
+                // Create a ROS subscriber for the input point cloud
+                ros::Subscriber sub;
+                if(strcmp(_camera_type.c_str(), "kinect_2") == 0)
+                    sub = nh.subscribe ("/kinect2/hd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+                if(strcmp(_camera_type.c_str(), "kinect_1") == 0)
+                    sub = nh.subscribe ("/camera/depth_registered/sw_registered/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+                //        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+                ros::spin ();
+
+                while (ros::ok())
+                    viewer_.spinOnce (100, true);
+                boost::this_thread::sleep( boost::posix_time::milliseconds(100));
+            }
+
+        int nb_objects;
+
+        ros::Publisher _objects_positions_pub;
+        pcl_tracking::ObjectPosition obj_pos_msg_;
+        pcl::visualization::PCLVisualizer viewer_ ;
+        CloudPtr cloud_pass_;
+        CloudPtr cloud_pass_downsampled_;
+        // std::vector<CloudPtr> ref_cloud_vector; // object clouds to track
+        std::map<int, CloudPtr> ref_cloud_dict; // object clouds to track
+        std::map<int, CloudPtr> reference_dict;
+        std::map<int, RefCloudPtr> tracked_cloud_dict;
+        std::map<int, boost::shared_ptr<ParticleFilter> > tracker_dict;
+
+        std::string device_id_, _camera_type;
+        boost::mutex mtx_;
+        bool new_cloud_;
+        pcl::NormalEstimationOMP<PointType, pcl::Normal> ne_; // to store threadpool
+        unsigned counter_;
+        bool use_convex_hull_;
+        bool visualize_non_downsample_;
+        bool visualize_particles_;
+        bool print_time_;
+        bool use_fixed_;
+        int thread_nr_;
+        double tracking_time_;
+        double computation_time_;
+        double downsampling_time_;
+        double downsampling_grid_size_;
+        ros::NodeHandle nh;
+        XmlRpc::XmlRpcValue _parameters;
+    };
 
 int
 main (int argc, char** argv)
-{
-    bool use_convex_hull = true;
-    bool visualize_non_downsample = true;
-    bool visualize_particles = false;
-    bool use_fixed = false;
-    bool print_time = false;
+    {
+        bool use_convex_hull = true;
+        bool visualize_non_downsample = true;
+        bool visualize_particles = true;
+        bool use_fixed = false;
+        bool print_time = false;
 
-    double downsampling_grid_size = 0.01;
+        double downsampling_grid_size = 0.01;
 
-    std::string device_id = "#1";
+        std::string device_id = "#1";
 
-    // Initialize ROS
-    ros::init (argc, argv, "create_model");
-    ros::NodeHandle n;
+        // Initialize ROS
+        ros::init (argc, argv, "create_model");
+        ros::NodeHandle n;
 
-    // Restart robot position
-    //        ros::ServiceClient client = n.serviceClient<baxter_kinematics::RestartRobot>("/baxter_kinematics/restart_robot");
-    //        baxter_kinematics::RestartRobot srv;
-    //        if (client.call(srv))
-    //        {
-    //            ROS_INFO("Restarting robot position");
-    //        }
-    //        else
-    //        {
-    //            ROS_ERROR("Restarting robot position failed");
-    //        }
+        // Restart robot position
+        //        ros::ServiceClient client = n.serviceClient<baxter_kinematics::RestartRobot>("/baxter_kinematics/restart_robot");
+        //        baxter_kinematics::RestartRobot srv;
+        //        if (client.call(srv))
+        //        {
+        //            ROS_INFO("Restarting robot position");
+        //        }
+        //        else
+        //        {
+        //            ROS_ERROR("Restarting robot position failed");
+        //        }
 
-    // open kinect
-    OpenNISegmentTracking<pcl::PointXYZRGBA> v (device_id, 8, downsampling_grid_size,
-                                                use_convex_hull,
-                                                visualize_non_downsample, visualize_particles,
-                                                use_fixed, print_time, n);
-    v.run (argc, argv);
+        // open kinect
+        OpenNISegmentTracking<pcl::PointNormal> v (device_id, 8, downsampling_grid_size,
+                                                   use_convex_hull,
+                                                   visualize_non_downsample, visualize_particles,
+                                                   use_fixed, print_time, n);
+        v.run (argc, argv);
 
-}
+    }

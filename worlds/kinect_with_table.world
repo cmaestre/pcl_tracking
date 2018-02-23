@@ -7,8 +7,12 @@
       <pose>0.8 0.0 0.0 0.0 0.0 1.5707</pose>
     </include>
     <!-- include objects () -->
+    <include>
+    	<uri>model://coke_can</uri>
+    	<pose>0.9 0.0 1.73 0 0 0</pose>
+    </include>
     <!-- object 1 -->
-    <model name="my_model_1">
+    <!-- <model name="my_model_1">
 	  <pose>0.9 0.0 1.73 0 0 0</pose>
 	  <static>false</static>
 	    <link name="link">
@@ -44,7 +48,7 @@
         </material>
 	      </visual>
 	    </link>
-    </model>
+    </model> -->
 
     <include>
       <uri>model://ground_plane</uri>

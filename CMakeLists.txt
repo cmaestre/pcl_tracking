@@ -82,6 +82,9 @@ target_link_libraries (optitrack_handler ${catkin_LIBRARIES})
 
 ## Tests
 
+add_executable (normal_estimation test/normal_estimation.cpp)
+target_link_libraries (normal_estimation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 #add_executable (planar_segmentation test/planar_segmentation.cpp)
 #target_link_libraries (planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
@@ -94,5 +97,5 @@ target_link_libraries (optitrack_handler ${catkin_LIBRARIES})
 #add_executable (cluster_extraction test/cluster_extraction.cpp)
 #target_link_libraries (cluster_extraction ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-#add_executable (correspondence_grouping test/correspondence_grouping.cpp)
-#target_link_libraries (correspondence_grouping ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable (correspondence_grouping test/correspondence_grouping.cpp)
+target_link_libraries (correspondence_grouping ${catkin_LIBRARIES} ${PCL_LIBRARIES})

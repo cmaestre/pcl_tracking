@@ -20,6 +20,7 @@
 
 #include <pcl/ModelCoefficients.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl/features/normal_3d_omp.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
@@ -33,7 +34,8 @@
 #include <pcl_tracking/ObjectCloud.h>
 
 using namespace std;
-typedef pcl::PointXYZRGBA PointType;
+//typedef pcl::PointXYZRGBA PointType;
+typedef pcl::PointNormal PointType;
 string output_filename;
 
 class object_model_creater {
@@ -84,6 +86,7 @@ class object_model_creater {
             }
 
         void process_cloud(){
+                ROS_ERROR("TEST 11111");
                 _service_response.clear();
 
                 // Write the original version to disk
@@ -175,11 +178,11 @@ class object_model_creater {
                 writer.write<PointType> (path_filtered_pcd + "filtered.pcd", *cloud_filteredX, false);
 
                 // Euclidean filter
-                pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZRGBA>);
+                pcl::search::KdTree<PointType>::Ptr tree (new pcl::search::KdTree<PointType>);
                 tree->setInputCloud (cloud_filteredX);
 
                 std::vector<pcl::PointIndices> cluster_indices;
-                pcl::EuclideanClusterExtraction<pcl::PointXYZRGBA> ec;
+                pcl::EuclideanClusterExtraction<PointType> ec;
                 ec.setClusterTolerance (0.02); // 2cm
                 ec.setMinClusterSize (500);
                 ec.setMaxClusterSize (25000);
@@ -218,17 +221,21 @@ class object_model_creater {
                 int j = 0;
                 for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
                     {
-                        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGBA>);
+                        pcl::PointCloud<PointType>::Ptr cloud_cluster (new pcl::PointCloud<PointType>);
                         for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
                             cloud_cluster->points.push_back (tmp_cloud_pcl_tf->points[*pit]);
                         cloud_cluster->width = cloud_cluster->points.size ();
                         cloud_cluster->height = 1;
                         cloud_cluster->is_dense = true;
 
+//                        pcl::NormalEstimationOMP<PointType, PointType> nest;
+//                        nest.setRadiusSearch(0.01);
+//                        nest.setInputCloud(cloud_cluster);
+//                        nest.compute(*cloud_cluster);
                         // Write model files
                         std::stringstream ss;
                         ss << full_path << "/" << j << ".pcd";
-                        writer.write<pcl::PointXYZRGBA> (ss.str (), *cloud_cluster, false);
+                        writer.write<PointType> (ss.str (), *cloud_cluster, false);
 
                         // Expose models
                         sensor_msgs::PointCloud2 temp_ros_cloud;
