@@ -32,7 +32,8 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input){
       	pcl::PointCloud<pcl::PointXYZ> cloud_filtered;
       	pcl::PointCloud<pcl::PointXYZ> voxel_filtered;
         pcl::PointCloud<pcl::PointXYZ> cloud_segmented;
-	      pcl::PointCloud<pcl::PointXYZ> in_future;
+        pcl::PointCloud<pcl::PointXYZ> planar_object;
+        pcl::PointCloud<pcl::PointXYZ> in_future;
 
         pcl::fromROSMsg(*input, cloud);
 
@@ -44,30 +45,37 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input){
         segmentation.setModelType(pcl::SACMODEL_PLANE);
         segmentation.setMethodType(pcl::SAC_RANSAC);
         segmentation.setMaxIterations(1000);
-        segmentation.setDistanceThreshold(0.01);
+        segmentation.setDistanceThreshold(0.015);
         segmentation.setInputCloud(cloud.makeShared());
         segmentation.segment(*inliers, coefficients);
 
-        // Publish the model coefficients
-        pcl_msgs::ModelCoefficients ros_coefficients;
-        pcl_conversions::fromPCL(coefficients, ros_coefficients);
-        coef_pub.publish(ros_coefficients);
+//        // Publish the model coefficients
+//        pcl_msgs::ModelCoefficients ros_coefficients;
+//        pcl_conversions::fromPCL(coefficients, ros_coefficients);
+//        coef_pub.publish(ros_coefficients);
 
-        // Publish the Point Indices
-        pcl_msgs::PointIndices ros_inliers;
-        pcl_conversions::fromPCL(*inliers, ros_inliers);
-        ind_pub.publish(ros_inliers);
+//        // Publish the Point Indices
+//        pcl_msgs::PointIndices ros_inliers;
+//        pcl_conversions::fromPCL(*inliers, ros_inliers);
+//        ind_pub.publish(ros_inliers);
 
         // Create the filtering object
         pcl::ExtractIndices<pcl::PointXYZ> extract;
         extract.setInputCloud(cloud.makeShared());
         extract.setIndices(inliers);
         extract.setNegative(false);
-        extract.filter(cloud_segmented);
+//        extract.filter(cloud_segmented);
+        extract.filter(planar_object);
+
+
+        // Extract the planar object
+        extract.setNegative(true);
+        extract.filter(in_future);
 
         //Publish the new cloud
         sensor_msgs::PointCloud2 output;
-        pcl::toROSMsg(cloud_segmented, output);
+//        pcl::toROSMsg(cloud_segmented, output);
+        pcl::toROSMsg(in_future, output);
         pub.publish(output);
 
         ROS_ERROR("Publishing");

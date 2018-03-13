@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 project(pcl_tracking)
 
-find_package(PCL 1.8 REQUIRED)
+find_package(PCL 1.8.0 EXACT)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -fPIC")
 
@@ -59,14 +59,17 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-#add_executable (create_model src/create_model.cpp)
-#target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable (create_model src/create_model.cpp)
+target_link_libraries (create_model ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-#add_executable (auto_tracking src/auto_tracking.cpp)
-#target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable (create_model_planar_segmentation src/create_model_planar_segmentation.cpp)
+target_link_libraries (create_model_planar_segmentation ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-#add_executable (object_conversions src/object_conversions.cpp)
-#target_link_libraries (object_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable (auto_tracking src/auto_tracking.cpp)
+target_link_libraries (auto_tracking ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable (object_conversions src/object_conversions.cpp)
+target_link_libraries (object_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 #add_executable (optitrack_conversions src/optitrack_conversions.cpp)
 #target_link_libraries (optitrack_conversions ${catkin_LIBRARIES} ${PCL_LIBRARIES})

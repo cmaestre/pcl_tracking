@@ -4,6 +4,8 @@
 #include <tf/transform_listener.h>
 #include <tf2_msgs/TFMessage.h>
 #include <pcl_tracking/ObjectPosition.h>
+#include "mocap_optitrack/ObjectPositionID.h"
+#include "mocap_optitrack/ObjectPoseID.h"
 
 class tf_publisher{
 public:
@@ -24,7 +26,7 @@ public:
         //ROS_WARN_STREAM("The choosen point in camera frame is: X = " << point.point.x << ", Y = " << point.point.y << ", and Z = " << point.point.z);
 
 
-        publish_point_frame(object_msgs->object_position[i], "/visual/object_base_frame_" + std::to_string(i));
+        publish_point_frame(object_msgs->object_position[i].object_position, "/visual/object_base_frame_" + std::to_string(i));
         }
     }
 
@@ -85,24 +87,27 @@ int main(int argc, char **argv)
     while (ros::ok()) {
         ros::spinOnce();
 
-        geometry_msgs::PointStamped point;
+//        geometry_msgs::PointStamped point;
+        mocap_optitrack::ObjectPositionID point;
         for(int i = 0; i < my_tf_publisher.get_object_size(); i++){
             try{
                 child_frame_id = "/visual/object_base_frame_" + std::to_string(i);
                 listener.lookupTransform(parent_frame, child_frame_id, ros::Time(0), transform);
                 tf::transformStampedTFToMsg(transform, msg);
 
-                point.header.stamp = ros::Time::now();
-                point.header.frame_id = parent_frame;
-                point.point.x = msg.transform.translation.x;
-                point.point.y = msg.transform.translation.y;
-                point.point.z = msg.transform.translation.z;
-                point.header.seq = i;
+//                point.header.stamp = ros::Time::now();
+//                point.header.frame_id = parent_frame;
+
+                point.object_position.point.x = msg.transform.translation.x;
+                point.object_position.point.y = msg.transform.translation.y;
+                point.object_position.point.z = msg.transform.translation.z;
+//                point.header.seq = i;
+                point.ID = i;
                 obj_pos_msg_.object_position.push_back(point);
                 ROS_ERROR_STREAM("Object " << i << " : " <<
-                                                point.point.x << " " <<
-                                                point.point.y << " " <<
-                                                point.point.z);
+                                                point.object_position.point.x << " " <<
+                                                point.object_position.point.y << " " <<
+                                                point.object_position.point.z);
             }
             catch (tf::TransformException &ex) {
                 ROS_ERROR("%s",ex.what());

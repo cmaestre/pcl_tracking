@@ -226,7 +226,7 @@ public:
             tracker_->setStepNoiseCovariance (default_step_covariance);
             tracker_->setInitialNoiseCovariance (initial_noise_covariance);
             tracker_->setInitialNoiseMean (default_initial_mean);
-            tracker_->setIterationNum (1);
+            tracker_->setIterationNum (2);
 
             tracker_->setParticleNum (400);
             tracker_->setResampleLikelihoodThr(0.00);
@@ -250,7 +250,7 @@ public:
             boost::shared_ptr<pcl::search::Octree<RefPointType> > search (new pcl::search::Octree<RefPointType> (0.01));
             //boost::shared_ptr<pcl::search::OrganizedNeighbor<RefPointType> > search (new pcl::search::OrganizedNeighbor<RefPointType>);
             coherence->setSearchMethod (search);
-            coherence->setMaximumDistance (0.01);
+            coherence->setMaximumDistance (0.1);
             tracker_->setCloudCoherence (coherence);
 
             tracker_dict[obj_id] = tracker_;
@@ -481,15 +481,17 @@ public:
                 std::string parent_frame = "/base";
                 obj_pos_msg_.object_position.clear();
                 for(size_t i = 0; i < obj_pos_vector.size(); i++){
-                    geometry_msgs::PointStamped point;
-                    point.header.stamp = ros::Time::now();
-                    point.header.frame_id = "kinect2_link";
+//                    geometry_msgs::PointStamped point;
+                    mocap_optitrack::ObjectPositionID point;
+//                    point.header.stamp = ros::Time::now();
+//                    point.header.frame_id = "kinect2_link";
                     int tmp_id = obj_pos_vector[i].first;
                     std::vector<double> tmp_pos = obj_pos_vector[i].second;
-                    point.point.x = tmp_pos[0];
-                    point.point.y = tmp_pos[1];
-                    point.point.z = tmp_pos[2];
-                    point.header.seq = tmp_id;
+                    point.object_position.point.x = tmp_pos[0];
+                    point.object_position.point.y = tmp_pos[1];
+                    point.object_position.point.z = tmp_pos[2];
+//                    point.header.seq = tmp_id;
+                    point.ID = i;
                     obj_pos_msg_.object_position.push_back(point);
 //                    ROS_ERROR_STREAM("Base frame object " <<
 //                                                    tmp_id << " : " <<
@@ -770,7 +772,7 @@ public:
         initialize_trackers(); // one tracker per object
 
         // Create a ROS subscriber for the input point cloud
-        ros::Subscriber sub = nh.subscribe ("/kinect2/hd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
+        ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
 //        ros::Subscriber sub = nh.subscribe ("/kinect2/sd/points", 1, &OpenNISegmentTracking::cloud_cb, this);
         ros::spin ();
 
